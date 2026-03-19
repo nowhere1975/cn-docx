@@ -1,0 +1,19 @@
+{
+  "name": "cn-docx-web",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0",
+    "bcrypt": "^6.0.0",
+    "better-sqlite3": "^12.8.0",
+    "cookie-parser": "^1.4.7",
+    "dotenv": "^16.4.7",
+    "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.3",
+    "openai": "^6.32.0"
+  }
+}

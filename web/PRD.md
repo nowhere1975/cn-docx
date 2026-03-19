@@ -1,0 +1,192 @@
+# 文档助手 Web 端 PRD
+
+> 版本：v2.0 · 更新：2026-03-19
+
+## 产品定位
+
+面向中国用户的 AI 文档生成 Web 服务，支持通用文档与正式公文（GB/T 9704-2012）。
+核心体验：描述需求 → AI 生成 → 一键下载 Word 文档。
+
+---
+
+## 界面布局
+
+三栏布局，参考 claude.ai / metaso.cn 风格。
+
+```
+┌─────────────────────┬──────────────────────────┬─────────────────────┐
+│      左侧栏 240px    │      中间：输入区           │    右侧：文档面板 320px│
+│                     │                          │                     │
+│  [文 文档助手] [新建] │  ← 根据左侧所选模式变化 →  │  [docx 预览]        │
+│  ─────────────────  │                          │  文件名.docx  ↓下载  │
+│  [功能]             │  粘贴排版：文本输入框        │  ─────────────────  │
+│                     │  AI起草：目标+要求输入框     │  历史版本：          │
+│  ● 粘贴排版          │  补充信息（折叠）            │  v3 · 今天 14:32    │
+│    通用文档          │  [生成 Word 文档]           │  v2 · 今天 11:20    │
+│  ○ AI 起草          │                          │  v1 · 昨天 09:05    │
+│    通用文档          │                          │                     │
+│  ○ 公文排版          │                          │                     │
+│    正式公文          │                          │                     │
+│  ○ 公文起草          │                          │                     │
+│    正式公文          │                          │                     │
+│                     │                          │                     │
+│  公文模式额外展开：   │                          │                     │
+│  ─ 样式: 普通/红头   │                          │                     │
+│  ─ 文种: 通知/请示…  │                          │                     │
+│                     │                          │                     │
+│  ─────────────────  │                          │                     │
+│  历史记录            │                          │                     │
+│  今天               │                          │                     │
+│   · 某通知草稿       │                          │                     │
+│  昨天               │                          │                     │
+│   · 工作总结         │                          │                     │
+│  ─────────────────  │                          │                     │
+│  🔒 隐私模式 [○]    │                          │                     │
+│  积分: 10 [充值]     │                          │                     │
+└─────────────────────┴──────────────────────────┴─────────────────────┘
+```
+
+**移动端**：左侧栏收为顶部汉堡菜单抽屉，右侧面板在生成后底部滑出。
+
+---
+
+## 功能模块
+
+### 1. 登录 / 身份认证
+
+- **方式**：手机号 + 短信验证码（一步完成注册与登录）
+- **开发阶段**：Mock 模式，验证码直接在接口响应中返回，前端自动填入（不真实发短信）
+- **生产阶段**：接入阿里云 / 腾讯云短信网关
+- **后续扩展**：微信扫码登录（需公众号资质，待申请后添加）
+- **会话**：JWT token 写入 httpOnly cookie，有效期 7 天
+- 无昵称/密码，手机号即身份
+
+### 2. 四种生成模式（左侧功能栏单选）
+
+| 模式 | 说明 | 积分消耗 |
+|------|------|---------|
+| 粘贴排版 | 粘贴已有内容，AI 解析结构并排版 | 1 分 |
+| AI 起草 | 描述目标，AI 写稿并排版 | 5 分 |
+| 公文排版 | 粘贴内容，按 GB/T 9704-2012 排版 | 1 分 |
+| 公文起草 | 描述目标，AI 写公文并排版 | 5 分 |
+
+选中公文类模式时，左侧栏展开：
+- 公文样式：普通公文 / 红头公文（GB/T 9704-2012）
+- 文种：通知、通报、请示、函、报告、纪要、讲话稿、方案
+
+### 3. 历史记录与文件存储
+
+**默认行为（正常模式）**：
+- 每次生成创建一条 session 记录（含输入参数、模式、文种等）
+- 生成的 .docx 文件落盘保存至服务器 `storage/docs/{userId}/`
+- 左侧历史记录按日期分组展示，点击可恢复参数并查看/下载文件
+- 同一 session 多次生成产生多个版本（v1/v2/v3），右侧面板展示版本列表
+
+**隐私模式**：
+- 用户在左侧底部切换开关启用
+- 开启后中间区顶部显示橙色提示条："隐私模式已开启 · 本次操作不保存历史和文件"
+- 历史记录列表置灰不可点击
+- 生成时走临时文件流程：文件不落盘，session 不记录
+- 右侧面板仍显示当次预览和下载（内存流），刷新后消失
+- 隐私模式状态保存在用户账户中（DB），不是 localStorage
+
+### 4. 右侧文档面板
+
+- 空状态：引导文案"生成后文档预览将显示在这里"
+- 生成后：docx 在线预览（docx-preview.js）+ 文件名 + 下载按钮
+- 版本列表：当前 session 的所有历史版本可切换查看/下载
+- 已登录且正常模式下，历史 session 的文档也可在此下载
+
+---
+
+## 数据库设计
+
+### users 表（改造）
+```sql
+id, phone TEXT UNIQUE NOT NULL,
+nickname TEXT,
+points INTEGER DEFAULT 10,
+privacy_mode INTEGER DEFAULT 0,   -- 0=正常 1=隐私
+created_at, updated_at
+```
+
+### otp_codes 表（新增）
+```sql
+id, phone TEXT, code TEXT,
+expires_at DATETIME,
+used INTEGER DEFAULT 0,
+created_at
+```
+
+### sessions 表（新增）
+```sql
+id, user_id INTEGER,
+title TEXT,                        -- 文档标题（AI 解析后写入）
+mode TEXT,                         -- general | official
+style TEXT,                        -- standard | strict
+doc_type TEXT,                     -- tongzhi | baogao | ...
+input_snapshot TEXT,               -- JSON，保存输入参数
+privacy INTEGER DEFAULT 0,         -- 生成时的隐私状态快照
+created_at
+```
+
+### documents 表（新增）
+```sql
+id, session_id INTEGER, user_id INTEGER,
+filename TEXT,
+file_path TEXT,                    -- 相对于 storage/ 的路径
+file_size INTEGER,
+version INTEGER DEFAULT 1,
+privacy INTEGER DEFAULT 0,
+created_at
+```
+
+### points_log 表（保留）
+### api_usage 表（保留）
+
+---
+
+## 后端接口
+
+### 认证
+```
+POST /api/auth/send-otp      { phone }           → { ok, code* }  (* mock 模式带 code)
+POST /api/auth/verify-otp    { phone, code }     → { user }
+POST /api/auth/logout
+GET  /api/auth/me
+PATCH /api/auth/privacy      { privacy_mode }    → { ok }
+```
+
+### 文档生成（改造现有接口，增加存储逻辑）
+```
+POST /api/convert            粘贴排版
+POST /api/generate           AI 起草
+  两个接口均：
+  - 正常模式：落盘 + 写 sessions/documents 表 + 返回文件流
+  - 隐私模式：临时文件 + 不写 DB + 返回文件流
+```
+
+### 历史记录（新增）
+```
+GET  /api/history                  → sessions 列表（分页）
+GET  /api/history/:sid             → session 详情 + documents 列表
+GET  /api/docs/:docId/download     → 下载已保存文件
+DELETE /api/docs/:docId            → 删除单个文件
+DELETE /api/history/:sid           → 删除 session 及其所有文件
+```
+
+---
+
+## 开发顺序
+
+| 步骤 | 内容 |
+|------|------|
+| 1 | DB 迁移：users 改手机号，加 otp_codes / sessions / documents 表 |
+| 2 | 后端：手机验证码登录（mock） + 隐私模式开关接口 |
+| 3 | 后端：convert / generate 接口增加文件落盘 + session 记录逻辑 |
+| 4 | 后端：history 路由（列表、详情、下载、删除） |
+| 5 | 前端：三栏布局重构（HTML/CSS） |
+| 6 | 前端：手机登录弹窗 |
+| 7 | 前端：左侧栏（模式选择 + 公文参数 + 历史记录 + 隐私开关 + 积分） |
+| 8 | 前端：中间输入区（根据模式切换） |
+| 9 | 前端：右侧文档面板（预览 + 版本列表） |

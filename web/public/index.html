@@ -1,0 +1,1041 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>文档助手 · lab.nowhere.pub</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --sidebar-w:    240px;
+      --panel-w:      320px;
+      --bg:           #f5f5f4;
+      --surface:      #ffffff;
+      --sidebar-bg:   #1c1917;
+      --sidebar-text: #d6d3d1;
+      --sidebar-muted:#78716c;
+      --sidebar-hover:#292524;
+      --sidebar-active:#3d3834;
+      --primary:      #4f46e5;
+      --primary-h:    #4338ca;
+      --primary-soft: #eef2ff;
+      --text:         #111827;
+      --text-2:       #374151;
+      --muted:        #6b7280;
+      --border:       #e5e7eb;
+      --border-focus: #a5b4fc;
+      --success:      #059669;
+      --error:        #dc2626;
+      --warning:      #d97706;
+      --warning-bg:   #fffbeb;
+      --warning-border:#fde68a;
+      --r:            12px;
+      --r-sm:         8px;
+      --shadow:       0 1px 3px rgba(0,0,0,.08);
+      --shadow-lg:    0 4px 16px rgba(0,0,0,.08);
+    }
+
+    html, body { height: 100%; overflow: hidden; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "PingFang SC",
+                   "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 14px;
+      line-height: 1.6;
+      display: flex;
+    }
+
+    /* ══════════════════════════════════════
+       左侧栏
+    ══════════════════════════════════════ */
+    .sidebar {
+      width: var(--sidebar-w);
+      flex-shrink: 0;
+      background: var(--sidebar-bg);
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* Logo + 新建 */
+    .sidebar-header {
+      padding: 16px 14px 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border-bottom: 1px solid #292524;
+    }
+    .sidebar-logo {
+      width: 30px; height: 30px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px; color: white; font-weight: 700; flex-shrink: 0;
+    }
+    .sidebar-brand {
+      flex: 1;
+      font-size: 13.5px; font-weight: 600;
+      color: #e7e5e4;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .btn-new {
+      padding: 4px 10px;
+      background: #3d3834; color: var(--sidebar-text);
+      border: 1px solid #44403c; border-radius: 6px;
+      font-size: 12px; font-family: inherit;
+      cursor: pointer; white-space: nowrap; flex-shrink: 0;
+      transition: background .15s;
+    }
+    .btn-new:hover { background: #57534e; }
+
+    /* 功能区 */
+    .sidebar-section {
+      padding: 10px 10px 4px;
+    }
+    .sidebar-section-label {
+      font-size: 10.5px; font-weight: 600; letter-spacing: .06em;
+      color: var(--sidebar-muted);
+      padding: 0 6px 6px;
+      text-transform: uppercase;
+    }
+
+    /* 模式列表 */
+    .mode-list { display: flex; flex-direction: column; gap: 1px; }
+    .mode-item {
+      display: flex; flex-direction: column;
+      padding: 8px 10px;
+      border-radius: var(--r-sm);
+      cursor: pointer;
+      transition: background .12s;
+      border: none; background: none;
+      text-align: left; font-family: inherit;
+      color: var(--sidebar-text);
+      width: 100%;
+    }
+    .mode-item:hover { background: var(--sidebar-hover); }
+    .mode-item.active { background: var(--sidebar-active); }
+    .mode-item-name {
+      font-size: 13px; font-weight: 500;
+      display: flex; align-items: center; gap: 7px;
+    }
+    .mode-item.active .mode-item-name { color: #fff; }
+    .mode-item-dot {
+      width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+      background: var(--sidebar-muted); transition: background .12s;
+    }
+    .mode-item.active .mode-item-dot { background: #818cf8; }
+    .mode-item-sub { font-size: 11px; color: var(--sidebar-muted); padding-left: 13px; margin-top: 1px; }
+
+    /* 文档类型内联选择（中间区域） */
+    .doc-type-row {
+      display: flex; gap: 8px;
+    }
+    .doc-type-card {
+      flex: 1; display: flex; flex-direction: column; gap: 2px;
+      padding: 10px 14px;
+      border: 1.5px solid var(--border); border-radius: var(--r-sm);
+      background: var(--surface); cursor: pointer;
+      transition: border-color .15s, background .15s;
+      position: relative;
+    }
+    .doc-type-card:hover:not(.active) { border-color: var(--border-focus); background: #fafbff; }
+    .doc-type-card.active { border-color: var(--primary); background: var(--primary-soft); }
+    .doc-type-card input[type="radio"] {
+      position: absolute; opacity: 0; pointer-events: none;
+    }
+    .doc-type-name {
+      font-size: 13px; font-weight: 600; color: var(--text-2);
+      display: flex; align-items: center; gap: 6px;
+    }
+    .doc-type-card.active .doc-type-name { color: var(--primary); }
+    .doc-type-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      background: var(--border); flex-shrink: 0; transition: background .15s;
+    }
+    .doc-type-card.active .doc-type-dot { background: var(--primary); }
+    .doc-type-sub { font-size: 11px; color: var(--muted); padding-left: 12px; }
+
+    /* 公文参数内联展开区 */
+    .official-inline {
+      margin-top: 10px; padding: 12px 14px;
+      background: #f9fafb; border: 1.5px solid var(--border);
+      border-radius: var(--r-sm);
+    }
+    .inline-select {
+      width: 100%; padding: 7px 10px;
+      border: 1.5px solid var(--border); border-radius: 6px;
+      font-size: 13px; font-family: inherit;
+      color: var(--text); background: var(--surface);
+      outline: none; cursor: pointer;
+      appearance: none; -webkit-appearance: none;
+      transition: border-color .15s;
+    }
+    .inline-select:focus { border-color: var(--border-focus); box-shadow: 0 0 0 2px rgba(99,102,241,.08); }
+
+    /* 历史记录 */
+    .history-section {
+      flex: 1; overflow-y: auto;
+      padding: 10px 10px 4px;
+    }
+    .history-section::-webkit-scrollbar { width: 4px; }
+    .history-section::-webkit-scrollbar-thumb { background: #44403c; border-radius: 2px; }
+
+    .history-group-label {
+      font-size: 10.5px; font-weight: 600; letter-spacing: .06em;
+      color: var(--sidebar-muted);
+      padding: 6px 6px 4px;
+      text-transform: uppercase;
+    }
+    .history-item {
+      display: flex; align-items: center; gap: 6px;
+      padding: 6px 8px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background .12s;
+      position: relative;
+    }
+    .history-item:hover { background: var(--sidebar-hover); }
+    .history-item.active { background: var(--sidebar-active); }
+    .history-item-title {
+      flex: 1; font-size: 12.5px; color: #a8a29e;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .history-item.active .history-item-title { color: #e7e5e4; }
+    .history-item-del {
+      opacity: 0; width: 18px; height: 18px;
+      background: none; border: none;
+      color: var(--sidebar-muted); cursor: pointer;
+      font-size: 14px; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      border-radius: 4px; transition: opacity .12s, background .12s;
+    }
+    .history-item:hover .history-item-del { opacity: 1; }
+    .history-item-del:hover { background: #44403c; color: #fca5a5; }
+    .history-empty {
+      font-size: 12px; color: var(--sidebar-muted);
+      padding: 8px 8px 4px; line-height: 1.5;
+    }
+    .history-locked {
+      font-size: 11.5px; color: var(--sidebar-muted);
+      padding: 10px 8px; text-align: center; line-height: 1.5;
+    }
+
+    /* 底部：隐私 + 积分 */
+    .sidebar-footer {
+      padding: 10px 10px 14px;
+      border-top: 1px solid #292524;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .privacy-row {
+      display: flex; align-items: center; gap: 8px;
+      padding: 6px 8px;
+      border-radius: 6px;
+      transition: background .12s;
+      cursor: pointer;
+    }
+    .privacy-row:hover { background: var(--sidebar-hover); }
+    .privacy-label {
+      flex: 1; font-size: 12.5px; color: var(--sidebar-text);
+      display: flex; align-items: center; gap: 6px;
+    }
+    .privacy-icon { font-size: 14px; }
+    /* Toggle switch */
+    .toggle {
+      width: 32px; height: 18px; position: relative; flex-shrink: 0;
+    }
+    .toggle input { opacity: 0; width: 0; height: 0; position: absolute; }
+    .toggle-track {
+      position: absolute; inset: 0;
+      background: #44403c; border-radius: 9px;
+      transition: background .2s; cursor: pointer;
+    }
+    .toggle input:checked + .toggle-track { background: #6366f1; }
+    .toggle-thumb {
+      position: absolute; top: 2px; left: 2px;
+      width: 14px; height: 14px; border-radius: 50%;
+      background: white; transition: transform .2s; pointer-events: none;
+    }
+    .toggle input:checked ~ .toggle-thumb { transform: translateX(14px); }
+
+    .user-row {
+      display: flex; align-items: center; gap: 6px;
+      padding: 4px 8px;
+    }
+    .points-chip {
+      display: inline-flex; align-items: center; gap: 4px;
+      background: #292524; color: #fbbf24;
+      font-size: 12px; font-weight: 600;
+      padding: 3px 9px; border-radius: 20px;
+    }
+    .sidebar-user-name {
+      flex: 1; font-size: 12px; color: var(--sidebar-muted);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .btn-sidebar-sm {
+      padding: 3px 8px;
+      background: none; border: 1px solid #44403c;
+      border-radius: 5px; color: var(--sidebar-muted);
+      font-size: 11px; font-family: inherit; cursor: pointer;
+      white-space: nowrap; flex-shrink: 0;
+      transition: all .15s;
+    }
+    .btn-sidebar-sm:hover { border-color: #6366f1; color: #818cf8; }
+    .btn-sidebar-login {
+      width: 100%; padding: 8px;
+      background: #3d3834; color: #e7e5e4;
+      border: 1px solid #57534e; border-radius: 7px;
+      font-size: 13px; font-weight: 500; font-family: inherit;
+      cursor: pointer; transition: background .15s;
+    }
+    .btn-sidebar-login:hover { background: #57534e; }
+
+    /* ══════════════════════════════════════
+       中间主区域
+    ══════════════════════════════════════ */
+    .main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    /* 隐私模式提示条 */
+    .privacy-banner {
+      background: var(--warning-bg);
+      border-bottom: 1px solid var(--warning-border);
+      padding: 8px 24px;
+      font-size: 12.5px; color: var(--warning);
+      display: none; align-items: center; gap: 8px;
+    }
+    .privacy-banner.show { display: flex; }
+
+    .main-body {
+      flex: 1; overflow-y: auto;
+      padding: 32px 32px 48px;
+    }
+    .main-body::-webkit-scrollbar { width: 6px; }
+    .main-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+    .main-title {
+      font-size: 16px; font-weight: 600;
+      color: var(--text); margin-bottom: 20px;
+    }
+
+    /* 输入卡片 */
+    .input-card {
+      background: var(--surface);
+      border-radius: var(--r);
+      box-shadow: var(--shadow-lg);
+      padding: 24px;
+      display: flex; flex-direction: column; gap: 18px;
+    }
+
+    .field { display: flex; flex-direction: column; gap: 6px; }
+    .label { font-size: 12.5px; font-weight: 500; color: var(--text-2); }
+    .label-row { display: flex; align-items: center; justify-content: space-between; }
+
+    textarea, input[type="text"] {
+      width: 100%; padding: 10px 12px;
+      border: 1.5px solid var(--border); border-radius: var(--r-sm);
+      font-size: 14px; font-family: inherit; line-height: 1.7;
+      color: var(--text); background: var(--surface);
+      outline: none; transition: border-color .15s, box-shadow .15s;
+      resize: vertical;
+    }
+    textarea { min-height: 180px; }
+    textarea:focus, input[type="text"]:focus {
+      border-color: var(--border-focus);
+      box-shadow: 0 0 0 3px rgba(99,102,241,.10);
+    }
+    textarea::placeholder, input::placeholder { color: #9ca3af; }
+    .char-count { font-size: 11.5px; color: var(--muted); text-align: right; margin-top: 2px; }
+
+    /* Markdown 切换 */
+    .md-toggle-btn {
+      font-size: 11.5px; padding: 3px 10px;
+      border: 1.5px solid var(--border-focus); border-radius: 20px;
+      background: var(--primary-soft); color: var(--primary);
+      cursor: pointer; font-family: inherit; font-weight: 500;
+    }
+    .md-toggle-btn.active { background: var(--primary); color: white; }
+    .md-preview {
+      border: 1.5px solid var(--border); border-radius: var(--r-sm);
+      padding: 12px 14px; min-height: 180px; max-height: 360px;
+      overflow-y: auto; line-height: 1.75; font-size: 14px;
+      background: var(--surface); display: none;
+    }
+    .md-preview h1,.md-preview h2,.md-preview h3 { font-weight: 600; margin: 8px 0 4px; }
+    .md-preview h1 { font-size: 1.25em; } .md-preview h2 { font-size: 1.1em; }
+    .md-preview p  { margin: 4px 0; }
+    .md-preview ul,.md-preview ol { padding-left: 18px; margin: 4px 0; }
+    .md-preview code { background: #f3f4f6; padding: 1px 5px; border-radius: 3px; font-size: .875em; }
+    .md-preview pre  { background: #f3f4f6; padding: 10px 12px; border-radius: 6px; margin: 6px 0; overflow-x: auto; }
+    .md-preview pre code { background: none; padding: 0; }
+    .md-preview strong { font-weight: 700; } .md-preview em { font-style: italic; }
+
+    /* AI 起草区 */
+    .ai-area { display: none; flex-direction: column; gap: 14px; }
+    .ai-area.show { display: flex; }
+
+    /* Accordion 补充信息 */
+    .accordion-wrap { border: 1.5px solid var(--border); border-radius: var(--r-sm); overflow: hidden; }
+    .accordion-trigger {
+      width: 100%; padding: 10px 14px;
+      display: flex; align-items: center; gap: 8px;
+      cursor: pointer; font-family: inherit;
+      background: #fafafa; border: none;
+      font-size: 13px; font-weight: 500; color: var(--text-2);
+      text-align: left; user-select: none;
+      transition: background .15s;
+    }
+    .accordion-trigger:hover { background: #f3f4f6; }
+    .accordion-trigger.open  { background: var(--primary-soft); color: var(--primary); border-bottom: 1.5px solid var(--border); }
+    .accordion-label { flex: 1; }
+    .accordion-hint {
+      font-size: 11px; font-weight: 400; color: var(--success);
+      background: #d1fae5; padding: 1px 8px; border-radius: 4px;
+      max-width: 150px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      display: none;
+    }
+    .accordion-chevron { font-size: 10px; color: var(--muted); transition: transform .2s; }
+    .accordion-trigger.open .accordion-chevron { transform: rotate(90deg); }
+    .accordion-body {
+      padding: 14px; display: none;
+      flex-direction: column; gap: 12px;
+    }
+    .accordion-body.show { display: flex; }
+    .row { display: flex; gap: 12px; }
+    .row > .field { flex: 1; min-width: 0; }
+    .field-hint { font-size: 12px; color: var(--muted); }
+
+    /* 生成按钮 */
+    .btn-wrap { display: flex; flex-direction: column; gap: 6px; }
+    .btn {
+      width: 100%; padding: 13px;
+      background: linear-gradient(135deg, #4f46e5, #6366f1);
+      color: white; border: none; border-radius: var(--r-sm);
+      font-size: 14.5px; font-weight: 600; font-family: inherit;
+      cursor: pointer; transition: opacity .18s, transform .12s;
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+    }
+    .btn:hover:not(:disabled) { opacity: .9; transform: translateY(-1px); }
+    .btn:active:not(:disabled) { transform: none; }
+    .btn:disabled { opacity: .55; cursor: not-allowed; transform: none; }
+    .progress-track {
+      height: 3px; border-radius: 2px;
+      background: var(--border); overflow: hidden;
+      opacity: 0; transition: opacity .25s;
+    }
+    .progress-track.visible { opacity: 1; }
+    @keyframes prog-slide { from { transform: translateX(-100%); } to { transform: translateX(420%); } }
+    .progress-fill {
+      height: 100%; width: 25%;
+      background: linear-gradient(90deg, var(--primary), #818cf8);
+      animation: prog-slide 1.5s ease-in-out infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .spinner {
+      width: 16px; height: 16px; flex-shrink: 0;
+      border: 2.5px solid rgba(255,255,255,.35);
+      border-top-color: white; border-radius: 50%;
+      animation: spin .75s linear infinite;
+    }
+
+    /* 结果/错误（中间区域的反馈） */
+    @keyframes fadeUp { from { opacity:0; transform:translateY(8px); } to { opacity:1; transform:translateY(0); } }
+    .errbox {
+      margin-top: 14px; padding: 14px 18px;
+      background: #fef2f2; border: 1.5px solid #fecaca;
+      border-radius: var(--r); display: flex; gap: 10px;
+      animation: fadeUp .25s ease;
+    }
+    .errbox-icon { font-size: 16px; flex-shrink: 0; }
+    .errbox-msg  { font-size: 13.5px; color: var(--error); line-height: 1.5; }
+
+    /* ══════════════════════════════════════
+       右侧文档面板
+    ══════════════════════════════════════ */
+    .right-panel {
+      width: var(--panel-w);
+      flex-shrink: 0;
+      background: var(--surface);
+      border-left: 1px solid var(--border);
+      height: 100vh;
+      display: flex; flex-direction: column;
+      overflow: hidden;
+    }
+    .panel-header {
+      padding: 14px 18px 12px;
+      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; gap: 8px;
+    }
+    .panel-title { font-size: 13px; font-weight: 600; color: var(--text); flex: 1; }
+    .panel-body { flex: 1; overflow-y: auto; }
+    .panel-body::-webkit-scrollbar { width: 4px; }
+    .panel-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    /* 空状态 */
+    .panel-empty {
+      padding: 48px 24px; text-align: center;
+      display: flex; flex-direction: column; align-items: center; gap: 12px;
+    }
+    .panel-empty-icon {
+      width: 56px; height: 56px; border-radius: 16px;
+      background: var(--primary-soft);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 26px;
+    }
+    .panel-empty-title { font-size: 14px; font-weight: 600; color: var(--text); }
+    .panel-empty-sub   { font-size: 12.5px; color: var(--muted); line-height: 1.6; }
+
+    /* 文档结果卡 */
+    .doc-result {
+      padding: 16px 18px;
+      border-bottom: 1px solid var(--border);
+      animation: fadeUp .25s ease;
+    }
+    .doc-result-name {
+      font-size: 13px; font-weight: 600;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      margin-bottom: 8px;
+    }
+    .doc-result-meta { font-size: 11.5px; color: var(--muted); margin-bottom: 10px; }
+    .btn-dl {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 7px 16px;
+      background: var(--success); color: white;
+      border: none; border-radius: 6px;
+      font-size: 13px; font-weight: 600; font-family: inherit;
+      cursor: pointer; text-decoration: none;
+      transition: background .15s;
+    }
+    .btn-dl:hover { background: #047857; }
+
+    /* 版本列表 */
+    .version-section { padding: 14px 18px 8px; }
+    .version-section-title {
+      font-size: 11.5px; font-weight: 600; color: var(--muted);
+      letter-spacing: .04em; text-transform: uppercase; margin-bottom: 8px;
+    }
+    .version-item {
+      display: flex; align-items: center; gap: 8px;
+      padding: 7px 8px; border-radius: 6px;
+      cursor: pointer; transition: background .12s;
+    }
+    .version-item:hover { background: #f9fafb; }
+    .version-item.active { background: var(--primary-soft); }
+    .version-badge {
+      font-size: 11px; font-weight: 600;
+      padding: 1px 7px; border-radius: 4px;
+      background: var(--border); color: var(--muted); flex-shrink: 0;
+    }
+    .version-item.active .version-badge { background: var(--primary); color: white; }
+    .version-info { flex: 1; min-width: 0; }
+    .version-date { font-size: 11.5px; color: var(--muted); }
+    .version-dl {
+      font-size: 11px; color: var(--muted);
+      background: none; border: none; cursor: pointer;
+      text-decoration: underline; text-underline-offset: 2px;
+      font-family: inherit; padding: 0;
+      transition: color .12s;
+    }
+    .version-dl:hover { color: var(--primary); }
+
+    /* 预览按钮（下载旁边） */
+    .btn-preview {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 7px 14px;
+      background: var(--primary-soft); color: var(--primary);
+      border: 1.5px solid var(--border-focus); border-radius: 6px;
+      font-size: 13px; font-weight: 600; font-family: inherit;
+      cursor: pointer; text-decoration: none;
+      transition: background .15s;
+    }
+    .btn-preview:hover { background: #e0e7ff; }
+
+    /* docx 浮层预览 */
+    .docx-modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.55); backdrop-filter: blur(6px);
+      z-index: 800; display: flex; align-items: center; justify-content: center;
+      opacity: 0; visibility: hidden;
+      transition: opacity .2s, visibility .2s;
+      padding: 24px;
+    }
+    .docx-modal-overlay.visible { opacity: 1; visibility: visible; }
+    .docx-modal {
+      background: white; border-radius: 16px;
+      width: 100%; max-width: 800px;
+      max-height: 90vh;
+      display: flex; flex-direction: column;
+      box-shadow: 0 24px 64px rgba(0,0,0,.2);
+      transform: translateY(20px) scale(.97);
+      transition: transform .25s ease;
+      overflow: hidden;
+    }
+    .docx-modal-overlay.visible .docx-modal { transform: none; }
+    .docx-modal-header {
+      display: flex; align-items: center; gap: 10px;
+      padding: 14px 20px;
+      border-bottom: 1px solid var(--border);
+      flex-shrink: 0; background: #fafafa;
+    }
+    .docx-modal-title { flex: 1; font-size: 14px; font-weight: 600; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .docx-modal-note  { font-size: 11.5px; color: var(--muted); flex-shrink: 0; }
+    .docx-modal-close {
+      width: 30px; height: 30px; flex-shrink: 0;
+      background: none; border: none; cursor: pointer;
+      font-size: 20px; color: var(--muted); border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      transition: background .12s;
+    }
+    .docx-modal-close:hover { background: #f3f4f6; color: var(--text); }
+    .docx-modal-body { flex: 1; overflow-y: auto; }
+    .docx-modal-body::-webkit-scrollbar { width: 6px; }
+    .docx-modal-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+    #docxPreviewBody .docx-wrapper { background: #f0f2f5 !important; padding: 24px 0 !important; }
+    #docxPreviewBody .docx { box-shadow: 0 2px 12px rgba(0,0,0,.12) !important; }
+
+    /* ══════════════════════════════════════
+       Modal
+    ══════════════════════════════════════ */
+    .modal-overlay {
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.5); backdrop-filter: blur(4px);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 500; opacity: 0; visibility: hidden;
+      transition: opacity .2s, visibility .2s;
+    }
+    .modal-overlay.visible { opacity: 1; visibility: visible; }
+    .modal {
+      background: white; border-radius: 16px;
+      width: 90%; max-width: 360px;
+      box-shadow: 0 20px 50px rgba(0,0,0,.15);
+      transform: translateY(16px) scale(.97);
+      transition: transform .25s ease; position: relative;
+    }
+    .modal-overlay.visible .modal { transform: none; }
+    .modal-close {
+      position: absolute; top: 14px; right: 14px;
+      width: 28px; height: 28px; background: none; border: none;
+      font-size: 20px; color: var(--muted); cursor: pointer; line-height: 1;
+    }
+    .modal-header { padding: 22px 24px 0; }
+    .modal-title  { font-size: 17px; font-weight: 700; }
+    .modal-sub    { font-size: 13px; color: var(--muted); margin-top: 4px; }
+    .modal-body   { padding: 20px 24px 24px; }
+    .form-group   { margin-bottom: 14px; }
+    .form-label   { display: block; font-size: 12.5px; font-weight: 500; color: var(--text-2); margin-bottom: 5px; }
+    .form-input {
+      width: 100%; padding: 10px 12px;
+      border: 1.5px solid var(--border); border-radius: 8px;
+      font-size: 14px; font-family: inherit; outline: none;
+      transition: border-color .15s, box-shadow .15s;
+    }
+    .form-input:focus { border-color: var(--border-focus); box-shadow: 0 0 0 3px rgba(99,102,241,.10); }
+    .otp-row { display: flex; gap: 8px; }
+    .otp-row .form-input { flex: 1; letter-spacing: .2em; font-size: 18px; font-weight: 600; }
+    .btn-send-otp {
+      padding: 10px 14px; white-space: nowrap;
+      background: var(--primary-soft); color: var(--primary);
+      border: 1.5px solid var(--border-focus); border-radius: 8px;
+      font-size: 13px; font-weight: 500; font-family: inherit;
+      cursor: pointer; flex-shrink: 0; transition: background .15s;
+    }
+    .btn-send-otp:hover:not(:disabled) { background: #e0e7ff; }
+    .btn-send-otp:disabled { opacity: .55; cursor: not-allowed; }
+    .btn-submit {
+      width: 100%; padding: 12px;
+      background: linear-gradient(135deg, #4f46e5, #6366f1);
+      color: white; border: none; border-radius: 8px;
+      font-size: 14px; font-weight: 600; font-family: inherit;
+      cursor: pointer; transition: opacity .18s; margin-top: 4px;
+    }
+    .btn-submit:hover { opacity: .9; }
+    .btn-submit:disabled { opacity: .55; cursor: not-allowed; }
+    .form-note { font-size: 11.5px; color: var(--muted); margin-top: 10px; text-align: center; line-height: 1.5; }
+    .mock-hint {
+      font-size: 12px; color: var(--success); margin-top: 6px;
+      padding: 6px 10px; background: #d1fae5; border-radius: 6px; display: none;
+    }
+
+    /* 充值弹窗 */
+    .recharge-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 14px; }
+    .recharge-item {
+      padding: 14px 6px; background: var(--surface);
+      border: 2px solid var(--border); border-radius: 10px;
+      text-align: center; cursor: pointer; transition: all .15s;
+    }
+    .recharge-item:hover { border-color: var(--border-focus); }
+    .recharge-item.selected { border-color: var(--primary); background: var(--primary-soft); }
+    .recharge-amount { font-size: 18px; font-weight: 700; }
+    .recharge-points { font-size: 11.5px; color: var(--muted); margin-top: 2px; }
+    .recharge-item.selected .recharge-points { color: var(--primary); }
+
+    /* 积分记录 */
+    .points-log { max-height: 300px; overflow-y: auto; }
+    .log-item { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+    .log-item:last-child { border-bottom: none; }
+    .log-icon { width: 30px; height: 30px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 14px; }
+    .log-icon.recharge { background: #d1fae5; } .log-icon.consume { background: #fee2e2; } .log-icon.bonus { background: #dbeafe; }
+    .log-info { flex: 1; }
+    .log-desc { font-size: 13px; }
+    .log-date { font-size: 11px; color: var(--muted); margin-top: 1px; }
+    .log-amount { font-size: 13.5px; font-weight: 600; }
+    .log-amount.positive { color: var(--success); } .log-amount.negative { color: var(--error); }
+
+    /* ══════════════════════════════════════
+       中文字体 fallbacks
+    ══════════════════════════════════════ */
+    @font-face { font-family: '仿宋_GB2312'; src: local('FangSong_GB2312'), local('FangSong'), local('仿宋_GB2312'), local('仿宋'); font-display: swap; }
+    @font-face { font-family: '楷体_GB2312'; src: local('KaiTi_GB2312'), local('KaiTi'), local('楷体_GB2312'), local('楷体'), url('https://cdn.jsdelivr.net/npm/lxgw-wenkai-webfont@1.7.0/assets/LXGWWenKai-Regular.woff2') format('woff2'); font-display: swap; }
+    @font-face { font-family: '方正小标宋简体'; src: local('FZXiaoBiaoSong-B05S'), local('方正小标宋简体'); font-display: swap; }
+
+    /* ══════════════════════════════════════
+       移动端
+    ══════════════════════════════════════ */
+    .hamburger {
+      display: none; position: fixed; top: 12px; left: 12px; z-index: 200;
+      width: 36px; height: 36px; background: var(--sidebar-bg);
+      border: none; border-radius: 8px; cursor: pointer;
+      align-items: center; justify-content: center; flex-direction: column; gap: 4px;
+    }
+    .hamburger span { width: 16px; height: 2px; background: #d6d3d1; border-radius: 1px; display: block; }
+    .sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 150; }
+
+    @media (max-width: 900px) {
+      .right-panel { display: none; }
+    }
+    @media (max-width: 640px) {
+      .sidebar {
+        position: fixed; left: -100%; top: 0; z-index: 160;
+        transition: left .25s ease;
+      }
+      .sidebar.open { left: 0; }
+      .sidebar-overlay.show { display: block; }
+      .hamburger { display: flex; }
+      .main-body { padding: 20px 16px 48px; }
+      .main-body { padding-top: 56px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- 移动端汉堡按钮 -->
+<button class="hamburger" id="hamburger" onclick="toggleSidebar()">
+  <span></span><span></span><span></span>
+</button>
+<div class="sidebar-overlay" id="sidebarOverlay" onclick="closeSidebar()"></div>
+
+<!-- ══ 左侧栏 ══ -->
+<aside class="sidebar" id="sidebar">
+
+  <div class="sidebar-header">
+    <div class="sidebar-logo">文</div>
+    <span class="sidebar-brand">文档助手</span>
+    <button class="btn-new" onclick="newSession()">+ 新建</button>
+  </div>
+
+  <!-- 功能：模式选择 -->
+  <div class="sidebar-section">
+    <div class="sidebar-section-label">功能</div>
+    <div class="mode-list">
+      <button class="mode-item active" data-source="paste" onclick="selectSource(this)">
+        <div class="mode-item-name"><span class="mode-item-dot"></span>AI 排版</div>
+        <div class="mode-item-sub">粘贴内容，AI 自动排版</div>
+      </button>
+      <button class="mode-item" data-source="ai" onclick="selectSource(this)">
+        <div class="mode-item-name"><span class="mode-item-dot"></span>AI 生成</div>
+        <div class="mode-item-sub">描述需求，AI 起草文档</div>
+      </button>
+    </div>
+  </div>
+
+  <!-- 历史记录 -->
+  <div class="history-section" id="historySection">
+    <div class="sidebar-section-label">历史记录</div>
+    <div id="historyList">
+      <div class="history-empty">登录后查看历史记录</div>
+    </div>
+  </div>
+
+  <!-- 底部 -->
+  <div class="sidebar-footer">
+    <!-- 隐私模式 -->
+    <div class="privacy-row" onclick="togglePrivacy()">
+      <div class="privacy-label">
+        <span class="privacy-icon">🔒</span>
+        隐私模式
+      </div>
+      <label class="toggle" onclick="event.stopPropagation()">
+        <input type="checkbox" id="privacyToggle" onchange="togglePrivacy()">
+        <div class="toggle-track"></div>
+        <div class="toggle-thumb"></div>
+      </label>
+    </div>
+    <!-- 用户区 -->
+    <div id="sidebarUser">
+      <button class="btn-sidebar-login" onclick="showAuthModal()">登录 / 注册</button>
+    </div>
+  </div>
+
+</aside>
+
+<!-- ══ 中间主区域 ══ -->
+<main class="main">
+
+  <!-- 隐私模式提示条 -->
+  <div class="privacy-banner" id="privacyBanner">
+    🔒 隐私模式已开启 · 本次操作不会保存历史记录或文件
+  </div>
+
+  <div class="main-body">
+
+    <div class="main-title" id="mainTitle">粘贴排版 · 通用文档</div>
+
+    <div class="input-card">
+
+      <!-- 粘贴内容区 -->
+      <div class="field" id="pasteArea">
+        <div class="label-row">
+          <div class="label">粘贴文档内容</div>
+          <button id="mdToggleBtn" class="md-toggle-btn" style="display:none" onclick="toggleMdMode()">预览 Markdown</button>
+        </div>
+        <textarea id="content" rows="10"
+          placeholder="在这里粘贴 AI 生成的内容……
+
+AI 会自动识别标题、段落层级、落款单位、日期等信息，无需手动格式化。"></textarea>
+        <div id="mdPreview" class="md-preview"></div>
+        <div class="char-count" id="charCount">0 字</div>
+      </div>
+
+      <!-- AI 起草区 -->
+      <div class="ai-area" id="aiArea">
+        <div class="field">
+          <div class="label">文档目标 <span style="color:var(--error)">*</span></div>
+          <textarea id="goalI" rows="3" style="min-height:72px"
+            placeholder="例：写一份2026年第一季度工作总结，重点突出销售增长"></textarea>
+        </div>
+        <div class="field">
+          <div class="label">具体要求 <span style="font-size:11px;color:var(--muted)">可选</span></div>
+          <textarea id="reqI" rows="3" style="min-height:72px"
+            placeholder="例：约1500字，包含存在问题和下季度计划，语气正式"></textarea>
+        </div>
+      </div>
+
+      <!-- 文档类型 -->
+      <div class="field" id="docTypeSection">
+        <div class="label">文档类型</div>
+        <div class="doc-type-row">
+          <label class="doc-type-card active" id="cardGeneral" onclick="selectDocMode('general')">
+            <input type="radio" name="docMode" value="general" checked>
+            <div class="doc-type-name"><span class="doc-type-dot"></span>通用文档</div>
+            <div class="doc-type-sub">工作总结、方案、报告等</div>
+          </label>
+          <label class="doc-type-card" id="cardOfficial" onclick="selectDocMode('official')">
+            <input type="radio" name="docMode" value="official">
+            <div class="doc-type-name"><span class="doc-type-dot"></span>正式公文</div>
+            <div class="doc-type-sub">通知、请示、函、纪要等</div>
+          </label>
+        </div>
+        <!-- 公文参数：选正式公文后展开 -->
+        <div class="official-inline" id="officialInline" style="display:none">
+          <div class="row">
+            <div class="field">
+              <div class="label" style="font-size:11.5px">公文样式</div>
+              <select class="inline-select" id="styleS">
+                <option value="standard">普通公文</option>
+                <option value="strict">红头公文（GB/T 9704-2012）</option>
+              </select>
+            </div>
+            <div class="field">
+              <div class="label" style="font-size:11.5px">文种</div>
+              <select class="inline-select" id="docTypeS" onchange="onDocTypeChange()">
+                <option value="tongzhi">通知</option>
+                <option value="tongbao">通报</option>
+                <option value="qingshi">请示</option>
+                <option value="han">函</option>
+                <option value="baogao">报告</option>
+                <option value="jiyao">纪要</option>
+                <option value="jianghua">讲话稿</option>
+                <option value="fangan">方案</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 补充 / 修正信息 -->
+      <div class="accordion-wrap">
+        <button class="accordion-trigger" id="accordionTrigger" onclick="toggleAccordion()">
+          <span class="accordion-label">补充 / 修正信息</span>
+          <span class="accordion-hint" id="accordionHint"></span>
+          <span class="accordion-chevron" id="accordionChevron">▶</span>
+        </button>
+        <div class="accordion-body" id="accordionBody">
+          <p class="field-hint">若 AI 解析出的单位、日期等有误，可在此手动填写覆盖。</p>
+          <div class="row">
+            <div class="field">
+              <div class="label">发文单位</div>
+              <input id="orgI" type="text" placeholder="例：某市人民政府" oninput="updateAccordionHint()">
+            </div>
+            <div class="field">
+              <div class="label">落款日期</div>
+              <input id="dateI" type="text" placeholder="例：2026年3月19日" oninput="updateAccordionHint()">
+            </div>
+          </div>
+          <div class="row">
+            <div class="field">
+              <div class="label">作者</div>
+              <input id="authorI" type="text" placeholder="例：张三" oninput="updateAccordionHint()">
+            </div>
+            <div class="field" id="recipientField">
+              <div class="label">主送机关</div>
+              <input id="recipientI" type="text" placeholder="例：各部门、各单位：" oninput="updateAccordionHint()">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 生成按钮 -->
+      <div class="btn-wrap">
+        <button class="btn" id="genBtn" onclick="handleGen()">生成 Word 文档</button>
+        <div class="progress-track" id="progressTrack">
+          <div class="progress-fill"></div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- 错误提示（中间区域） -->
+    <div id="feedback"></div>
+
+  </div>
+</main>
+
+<!-- ══ 右侧文档面板 ══ -->
+<aside class="right-panel">
+
+  <div class="panel-header">
+    <span class="panel-title">📄 文档</span>
+  </div>
+
+  <div class="panel-body" id="panelBody">
+    <!-- 空状态 -->
+    <div class="panel-empty" id="panelEmpty">
+      <div class="panel-empty-icon">📝</div>
+      <div class="panel-empty-title">文档将显示在这里</div>
+      <div class="panel-empty-sub">生成后可在此预览、下载<br>并查看历史版本</div>
+    </div>
+
+    <!-- 文档结果（生成后显示） -->
+    <div id="docResult" style="display:none">
+      <div class="doc-result">
+        <div class="doc-result-name" id="docResultName">—</div>
+        <div class="doc-result-meta" id="docResultMeta"></div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <a class="btn-dl" id="docDownloadBtn" href="#" download>⬇ 下载文件</a>
+          <button class="btn-preview" id="docPreviewBtn" onclick="openDocxPreview()">👁 预览</button>
+        </div>
+      </div>
+
+      <!-- 版本列表 -->
+      <div class="version-section" id="versionSection" style="display:none">
+        <div class="version-section-title">本次会话版本</div>
+        <div id="versionList"></div>
+      </div>
+
+    </div>
+
+  </div>
+</aside>
+
+<!-- ══ 登录弹窗 ══ -->
+<div class="modal-overlay" id="authModal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeAuthModal()">&times;</button>
+    <div class="modal-header">
+      <div class="modal-title">登录 / 注册</div>
+      <div class="modal-sub">输入手机号，一步完成</div>
+    </div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">手机号</label>
+        <input type="tel" id="authPhone" class="form-input" placeholder="请输入手机号" maxlength="11">
+      </div>
+      <div class="form-group" id="otpGroup" style="display:none">
+        <label class="form-label">验证码</label>
+        <div class="otp-row">
+          <input type="text" id="authOtp" class="form-input" placeholder="6位验证码" maxlength="6" inputmode="numeric">
+          <button class="btn-send-otp" id="resendBtn" onclick="sendOtp(true)" disabled>重新发送</button>
+        </div>
+        <div class="mock-hint" id="mockHint"></div>
+      </div>
+      <button class="btn-submit" id="authSubmitBtn" onclick="handleAuth()">获取验证码</button>
+      <div class="form-note">未注册的手机号将自动创建账户，注册赠送 10 积分</div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ 充值弹窗 ══ -->
+<div class="modal-overlay" id="rechargeModal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeRechargeModal()">&times;</button>
+    <div class="modal-header">
+      <div class="modal-title">积分充值</div>
+      <div class="modal-sub">1 元 = 10 积分</div>
+    </div>
+    <div class="modal-body">
+      <div class="recharge-grid">
+        <div class="recharge-item" data-amount="10" onclick="selectRecharge(10)">
+          <div class="recharge-amount">10元</div>
+          <div class="recharge-points">100积分</div>
+        </div>
+        <div class="recharge-item" data-amount="50" onclick="selectRecharge(50)">
+          <div class="recharge-amount">50元</div>
+          <div class="recharge-points">500积分</div>
+        </div>
+        <div class="recharge-item" data-amount="100" onclick="selectRecharge(100)">
+          <div class="recharge-amount">100元</div>
+          <div class="recharge-points">1000积分</div>
+        </div>
+      </div>
+      <button class="btn-submit" id="rechargeBtn" onclick="handleRecharge()" disabled>请选择充值金额</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══ 积分记录弹窗 ══ -->
+<div class="modal-overlay" id="pointsLogModal">
+  <div class="modal" style="max-width:400px">
+    <button class="modal-close" onclick="closeModal('pointsLogModal')">&times;</button>
+    <div class="modal-header"><div class="modal-title">积分记录</div></div>
+    <div class="modal-body"><div class="points-log" id="pointsLogList"></div></div>
+  </div>
+</div>
+
+<!-- ══ docx 浮层预览 ══ -->
+<div class="docx-modal-overlay" id="docxModalOverlay" onclick="onDocxOverlayClick(event)">
+  <div class="docx-modal">
+    <div class="docx-modal-header">
+      <span class="docx-modal-title" id="docxModalTitle">文档预览</span>
+      <span class="docx-modal-note">字体效果以下载文件为准</span>
+      <button class="docx-modal-close" onclick="closeDocxPreview()">×</button>
+    </div>
+    <div class="docx-modal-body">
+      <div id="docxPreviewBody"></div>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/marked@14/marked.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3/dist/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/docx-preview@0.3.7/dist/docx-preview.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
