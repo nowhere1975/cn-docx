@@ -20,6 +20,7 @@ const {
   convertInchesToTwip,
   PageNumber,
   TabStopPosition, TabStopType,
+  Table, TableRow, TableCell, WidthType, ShadingType,
 } = require("docx");
 
 // ─────────────────────────────────────────────
@@ -215,6 +216,53 @@ function makeFooters(style) {
 // 正文渲染（公文模式）
 // ─────────────────────────────────────────────
 
+// ─────────────────────────────────────────────
+// 表格渲染（两种模式共用）
+// ─────────────────────────────────────────────
+
+function renderTable(node, sizePt, cnFont) {
+  const { headers = [], rows = [] } = node;
+
+  const cellBorder = {
+    top:    { style: BorderStyle.SINGLE, size: 4, color: "AAAAAA" },
+    bottom: { style: BorderStyle.SINGLE, size: 4, color: "AAAAAA" },
+    left:   { style: BorderStyle.SINGLE, size: 4, color: "AAAAAA" },
+    right:  { style: BorderStyle.SINGLE, size: 4, color: "AAAAAA" },
+  };
+
+  const makeCell = (text, bold = false, isHeader = false) =>
+    new TableCell({
+      borders: cellBorder,
+      shading: isHeader
+        ? { type: ShadingType.SOLID, fill: "E8E8E8", color: "E8E8E8" }
+        : undefined,
+      children: [makePara({
+        runs: [cnRun({ text: String(text ?? ""), cnFont, sizePt, bold })],
+        alignment: AlignmentType.CENTER,
+      })],
+    });
+
+  const tableRows = [];
+
+  if (headers.length) {
+    tableRows.push(new TableRow({
+      tableHeader: true,
+      children: headers.map(h => makeCell(h, true, true)),
+    }));
+  }
+
+  for (const row of rows) {
+    tableRows.push(new TableRow({
+      children: row.map(cell => makeCell(cell)),
+    }));
+  }
+
+  return new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    rows: tableRows,
+  });
+}
+
 function renderBodyOfficial(body, bodyFont, lineSpacingFixed, isStandard) {
   const INDENT = PT(32);  // 首行缩进两字（三号16pt×2=32pt）
   const paras = [];
@@ -223,6 +271,10 @@ function renderBodyOfficial(body, bodyFont, lineSpacingFixed, isStandard) {
   const h2Bold = isStandard;
 
   for (const node of body) {
+    if (node.type === 'table') {
+      paras.push(renderTable(node, 14, bodyFont));
+      continue;
+    }
     const { level = 0, number = "", heading, text = "" } = node;
 
     if (level === 0) {
@@ -288,6 +340,10 @@ function renderBodyGeneral(body, layout) {
   const paras = [];
 
   for (const node of body) {
+    if (node.type === 'table') {
+      paras.push(renderTable(node, bodySizePt, F.songti));
+      continue;
+    }
     const { level = 0, number = "", heading, text = "" } = node;
 
     if (level === 0) {
