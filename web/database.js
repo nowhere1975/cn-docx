@@ -12,13 +12,17 @@ db.pragma('foreign_keys = ON');
 
 db.exec(`
   CREATE TABLE IF NOT EXISTS users (
-    id           INTEGER PRIMARY KEY AUTOINCREMENT,
-    phone        TEXT UNIQUE NOT NULL,
-    nickname     TEXT,
-    points       INTEGER DEFAULT 10,
-    privacy_mode INTEGER DEFAULT 0,
-    created_at   DATETIME DEFAULT CURRENT_TIMESTAMP,
-    updated_at   DATETIME DEFAULT CURRENT_TIMESTAMP
+    id            INTEGER PRIMARY KEY AUTOINCREMENT,
+    username      TEXT UNIQUE NOT NULL,
+    password_hash TEXT,
+    phone         TEXT UNIQUE,
+    nickname      TEXT,
+    points        INTEGER DEFAULT 0,
+    privacy_mode  INTEGER DEFAULT 0,
+    invite_code   TEXT UNIQUE,
+    invited_by    INTEGER,
+    created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at    DATETIME DEFAULT CURRENT_TIMESTAMP
   );
 
   CREATE TABLE IF NOT EXISTS otp_codes (
@@ -75,28 +79,98 @@ db.exec(`
     created_at  DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (user_id) REFERENCES users(id)
   );
+
+  CREATE TABLE IF NOT EXISTS orders (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id    INTEGER NOT NULL,
+    package_id TEXT NOT NULL,
+    yuan       REAL NOT NULL,
+    points     INTEGER NOT NULL,
+    status     TEXT DEFAULT 'paid',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id)
+  );
+
+  CREATE TABLE IF NOT EXISTS user_tasks (
+    id         INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id    INTEGER NOT NULL,
+    task_key   TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, task_key),
+    FOREIGN KEY (user_id) REFERENCES users(id)
+  );
 `);
 
 // ── 用户 ──────────────────────────────────────────────────────────────
 
-function createUser(phone, nickname) {
-  const stmt = db.prepare(`
-    INSERT INTO users (phone, nickname, points)
-    VALUES (?, ?, 10)
-  `);
-  const result = stmt.run(phone, nickname || phone.slice(-4));
-  addPointsLog(result.lastInsertRowid, 10, 'bonus', '新用户注册赠送');
-  return result.lastInsertRowid;
+const TASK_POINTS = { profile: 2, first_convert: 2, first_generate: 2, first_official: 2 };
+const TASK_LABELS = {
+  profile:        '完善昵称',
+  first_convert:  '首次粘贴排版',
+  first_generate: '首次AI起草',
+  first_official: '首次使用公文模式',
+};
+
+const crypto = require('crypto');
+
+function _hashPassword(password) {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const hash = crypto.scryptSync(password, salt, 64).toString('hex');
+  return `${salt}:${hash}`;
+}
+
+function _checkPassword(password, stored) {
+  try {
+    const [salt, hash] = stored.split(':');
+    const candidate = crypto.scryptSync(password, salt, 64).toString('hex');
+    return crypto.timingSafeEqual(Buffer.from(candidate, 'hex'), Buffer.from(hash, 'hex'));
+  } catch {
+    return false;
+  }
+}
+
+// Admin 建用户（用户名+密码）
+function createUser(username, password, points = 0, nickname = '') {
+  const password_hash = _hashPassword(password);
+  const result = db.prepare(`
+    INSERT INTO users (username, password_hash, nickname, points)
+    VALUES (?, ?, ?, ?)
+  `).run(username, password_hash, nickname || username, points);
+  const userId = result.lastInsertRowid;
+  if (points > 0) addPointsLog(userId, points, 'bonus', '管理员初始赠送');
+  return userId;
+}
+
+// 用户名密码验证，成功返回用户，失败返回 null
+function verifyUser(username, password) {
+  const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
+  if (!user || !user.password_hash) return null;
+  if (!_checkPassword(password, user.password_hash)) return null;
+  return user;
+}
+
+// 修改密码
+function updatePassword(userId, password) {
+  db.prepare('UPDATE users SET password_hash = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?')
+    .run(_hashPassword(password), userId);
 }
 
 function getUserByPhone(phone) {
   return db.prepare('SELECT * FROM users WHERE phone = ?').get(phone);
 }
 
+function getUserByUsername(username) {
+  return db.prepare('SELECT * FROM users WHERE username = ?').get(username);
+}
+
 function getUserById(id) {
   return db.prepare(
-    'SELECT id, phone, nickname, points, privacy_mode, created_at FROM users WHERE id = ?'
+    'SELECT id, username, phone, nickname, points, privacy_mode, created_at FROM users WHERE id = ?'
   ).get(id);
+}
+
+function updateNickname(userId, nickname) {
+  db.prepare('UPDATE users SET nickname = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(nickname, userId);
 }
 
 function updateUserPoints(userId, delta) {
@@ -252,11 +326,94 @@ function getUserPoints(userId) {
   return row ? row.points : 0;
 }
 
+// ── 订单 ──────────────────────────────────────────────────────────────
+
+function createOrder(userId, packageId, yuan, points) {
+  const result = db.prepare(`
+    INSERT INTO orders (user_id, package_id, yuan, points, status)
+    VALUES (?, ?, ?, ?, 'paid')
+  `).run(userId, packageId, yuan, points);
+
+  // 被邀请人首次充值：邀请人额外 +10
+  const orderCount = db.prepare('SELECT COUNT(*) as n FROM orders WHERE user_id = ?').get(userId).n;
+  if (orderCount === 1) {
+    const user = db.prepare('SELECT invited_by FROM users WHERE id = ?').get(userId);
+    if (user && user.invited_by) {
+      updateUserPoints(user.invited_by, 10);
+      addPointsLog(user.invited_by, 10, 'invite', '被邀请人首次充值奖励');
+    }
+  }
+
+  return result.lastInsertRowid;
+}
+
+function getOrders(userId, limit = 20) {
+  return db.prepare(`
+    SELECT * FROM orders WHERE user_id = ? ORDER BY created_at DESC LIMIT ?
+  `).all(userId, limit);
+}
+
+function getAllOrders(limit = 50, offset = 0) {
+  return db.prepare(`
+    SELECT o.*, u.phone, u.nickname
+    FROM orders o JOIN users u ON u.id = o.user_id
+    ORDER BY o.created_at DESC LIMIT ? OFFSET ?
+  `).all(limit, offset);
+}
+
+function getOrdersStats() {
+  const today = db.prepare(`
+    SELECT COUNT(*) as count, SUM(yuan) as revenue, SUM(points) as points
+    FROM orders WHERE date(created_at) = date('now')
+  `).get();
+  const month = db.prepare(`
+    SELECT COUNT(*) as count, SUM(yuan) as revenue, SUM(points) as points
+    FROM orders WHERE strftime('%Y-%m', created_at) = strftime('%Y-%m', 'now')
+  `).get();
+  const total = db.prepare(`
+    SELECT COUNT(*) as count, SUM(yuan) as revenue, SUM(points) as points FROM orders
+  `).get();
+  return { today, month, total };
+}
+
+// ── 任务 ──────────────────────────────────────────────────────────────
+
+function completeTask(userId, taskKey) {
+  const result = db.prepare(
+    'INSERT OR IGNORE INTO user_tasks (user_id, task_key) VALUES (?, ?)'
+  ).run(userId, taskKey);
+  if (result.changes > 0) {
+    const pts = TASK_POINTS[taskKey] || 2;
+    updateUserPoints(userId, pts);
+    addPointsLog(userId, pts, 'task', `完成任务：${TASK_LABELS[taskKey] || taskKey}`);
+  }
+}
+
+function getUserTasks(userId) {
+  return db.prepare(
+    'SELECT task_key, created_at FROM user_tasks WHERE user_id = ?'
+  ).all(userId);
+}
+
+// ── 邀请统计 ──────────────────────────────────────────────────────────
+
+function getInviteStats(userId) {
+  const inviteCount = db.prepare(
+    'SELECT COUNT(*) as n FROM users WHERE invited_by = ?'
+  ).get(userId).n;
+  const invitePoints = db.prepare(
+    "SELECT COALESCE(SUM(amount),0) as n FROM points_log WHERE user_id = ? AND type = 'invite'"
+  ).get(userId).n;
+  return { inviteCount, invitePoints };
+}
+
 module.exports = {
   db,
   // 用户
-  createUser, getUserByPhone, getUserById, updateUserPoints, setPrivacyMode,
-  // OTP
+  createUser, verifyUser, updatePassword,
+  getUserByPhone, getUserByUsername, getUserById, updateUserPoints, setPrivacyMode,
+  updateNickname,
+  // OTP（保留备用）
   saveOtp, verifyOtp,
   // 历史
   createSession, updateSessionTitle, getSessionsByUser, getSessionById, deleteSession,
@@ -264,4 +421,12 @@ module.exports = {
   createDocument, getDocumentsBySession, getDocumentById, deleteDocument,
   // 积分
   addPointsLog, getPointsLog, addApiUsage, getUserPoints,
+  // 订单
+  createOrder, getOrders, getAllOrders, getOrdersStats,
+  // 任务
+  completeTask, getUserTasks,
+  // 邀请
+  getInviteStats,
+  // 任务元数据（供 route 使用）
+  TASK_POINTS, TASK_LABELS,
 };

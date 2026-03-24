@@ -42,7 +42,18 @@ router.get('/stats', requireAdmin, (req, res) => {
   const totalPoints   = db.db.prepare('SELECT SUM(points) as n FROM users').get().n || 0;
   const todayUsers    = db.db.prepare("SELECT COUNT(*) as n FROM users WHERE date(created_at)=date('now')").get().n;
   const todaySessions = db.db.prepare("SELECT COUNT(*) as n FROM sessions WHERE date(created_at)=date('now')").get().n;
-  res.json({ totalUsers, totalSessions, totalDocs, totalPoints, todayUsers, todaySessions });
+  const orders        = db.getOrdersStats();
+  res.json({ totalUsers, totalSessions, totalDocs, totalPoints, todayUsers, todaySessions, orders });
+});
+
+// ── 订单列表 ──────────────────────────────────────────────────────────
+router.get('/orders', requireAdmin, (req, res) => {
+  const page   = Math.max(1, parseInt(req.query.page)  || 1);
+  const limit  = Math.min(100, parseInt(req.query.limit) || 20);
+  const offset = (page - 1) * limit;
+  const orders = db.getAllOrders(limit, offset);
+  const total  = db.db.prepare('SELECT COUNT(*) as n FROM orders').get().n;
+  res.json({ orders, total, page, limit });
 });
 
 // ── 用户列表 ──────────────────────────────────────────────────────────
@@ -51,11 +62,11 @@ router.get('/users', requireAdmin, (req, res) => {
   const limit = Math.min(50, parseInt(req.query.limit) || 20);
   const q     = req.query.q ? `%${req.query.q}%` : null;
   const offset = (page - 1) * limit;
-  const where  = q ? 'WHERE u.phone LIKE ? OR u.nickname LIKE ?' : '';
+  const where  = q ? 'WHERE u.username LIKE ? OR u.nickname LIKE ?' : '';
   const args   = q ? [q, q, limit, offset] : [limit, offset];
 
   const users = db.db.prepare(`
-    SELECT u.id, u.phone, u.nickname, u.points, u.privacy_mode, u.created_at,
+    SELECT u.id, u.username, u.nickname, u.points, u.privacy_mode, u.created_at,
            COUNT(s.id) as session_count
     FROM users u LEFT JOIN sessions s ON s.user_id = u.id
     ${where} GROUP BY u.id ORDER BY u.created_at DESC LIMIT ? OFFSET ?
@@ -65,6 +76,25 @@ router.get('/users', requireAdmin, (req, res) => {
     .get(...(q ? [q, q] : [])).n;
 
   res.json({ users, total, page, limit });
+});
+
+// 新建用户
+router.post('/users', requireAdmin, (req, res) => {
+  const { username, password, nickname, points } = req.body;
+  if (!username || !password) return res.status(400).json({ error: '用户名和密码为必填' });
+  if (db.getUserByUsername(username.trim())) return res.status(409).json({ error: '用户名已存在' });
+  const id = db.createUser(username.trim(), password, parseInt(points) || 0, nickname || '');
+  res.json({ ok: true, user: db.getUserById(id) });
+});
+
+// 重置密码
+router.post('/users/:id/password', requireAdmin, (req, res) => {
+  const { password } = req.body;
+  if (!password || password.length < 6) return res.status(400).json({ error: '密码至少6位' });
+  const user = db.getUserById(req.params.id);
+  if (!user) return res.status(404).json({ error: '用户不存在' });
+  db.updatePassword(req.params.id, password);
+  res.json({ ok: true });
 });
 
 router.post('/users/:id/points', requireAdmin, (req, res) => {

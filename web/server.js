@@ -20,8 +20,25 @@ const app       = express();
 const PORT      = parseInt(process.env.PORT)      || 3000;
 const HTTP_PORT = parseInt(process.env.HTTP_PORT) || 80;
 
+const BASE_PATH        = process.env.BASE_PATH        || '';
+const TURNSTILE_SITEKEY = process.env.TURNSTILE_SITEKEY || '';
+
+// 信任 nginx 反向代理，使 req.ip 拿到真实客户端 IP
+app.set('trust proxy', 1);
+
 app.use(cookieParser());
 app.use(express.json({ limit: '2mb' }));
+
+// 动态配置脚本：注入 BASE_PATH 和 Turnstile sitekey 到前端
+app.get('/config.js', (_req, res) => {
+  res.setHeader('Content-Type', 'application/javascript; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.send(
+    `window.BASE_PATH=${JSON.stringify(BASE_PATH)};` +
+    `window.TURNSTILE_SITEKEY=${JSON.stringify(TURNSTILE_SITEKEY)};`
+  );
+});
+
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(authMiddleware);
 

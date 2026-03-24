@@ -2,6 +2,49 @@
 
 if (window.marked) marked.use({ breaks: true });
 
+// ── 部署配置（由 config.js 注入） ────────────────────────────────────
+const BASE = window.BASE_PATH || '';
+
+// ── Turnstile 不可见验证 ──────────────────────────────────────────────
+let _tsToken    = null;
+let _tsWidgetId = null;
+let _tsResolve  = null;
+
+function _initTurnstile() {
+  if (!window.turnstile || !window.TURNSTILE_SITEKEY) return;
+  _tsWidgetId = turnstile.render('#cf-turnstile', {
+    sitekey: window.TURNSTILE_SITEKEY,
+    size: 'invisible',
+    callback: (token) => {
+      _tsToken = token;
+      if (_tsResolve) { _tsResolve(token); _tsResolve = null; }
+    },
+    'expired-callback': () => { _tsToken = null; },
+    'error-callback':   () => {
+      _tsToken = null;
+      if (_tsResolve) { _tsResolve(null); _tsResolve = null; }
+    },
+  });
+  turnstile.execute(_tsWidgetId);
+}
+
+// 获取一次性 token；若尚未就绪则等待（最多 10s）
+function _getCfToken() {
+  if (!window.TURNSTILE_SITEKEY || !_tsWidgetId) return Promise.resolve(null);
+  if (_tsToken) {
+    const t = _tsToken;
+    _tsToken = null;
+    // 立刻预取下一个
+    try { turnstile.reset(_tsWidgetId); turnstile.execute(_tsWidgetId); } catch (_) {}
+    return Promise.resolve(t);
+  }
+  return new Promise((resolve) => {
+    _tsResolve = resolve;
+    setTimeout(() => { if (_tsResolve) { _tsResolve(null); _tsResolve = null; } }, 10000);
+    try { turnstile.execute(_tsWidgetId); } catch (_) {}
+  });
+}
+
 // ── 状态 ──────────────────────────────────────────────────────────────
 let mode     = 'general';
 let source   = 'paste';
@@ -192,7 +235,7 @@ async function handleGen() {
 async function handlePasteGen() {
   const text = ta.value.trim();
   if (!text || text.length < 10) return showErr('请先粘贴有效的文档内容（至少10个字符）');
-  await callApi('/api/convert', {
+  await callApi(BASE + '/api/convert', {
     text, mode,
     style:   mode === 'official' ? document.getElementById('styleS').value   : undefined,
     docType: mode === 'official' ? document.getElementById('docTypeS').value : undefined,
@@ -203,7 +246,7 @@ async function handlePasteGen() {
 async function handleAiGen() {
   const goal = document.getElementById('goalI').value.trim();
   if (!goal) return showErr('请填写文档目标');
-  await callApi('/api/generate', {
+  await callApi(BASE + '/api/generate', {
     goal,
     requirements: document.getElementById('reqI').value.trim() || undefined,
     mode,
@@ -229,12 +272,24 @@ async function callApi(url, payload) {
   genStartTime = Date.now();
 
   try {
+    // 获取 Turnstile token（游客模式保护，已登录用户服务端会跳过）
+    const cfToken = await _getCfToken();
+    if (cfToken) payload = { ...payload, cfToken };
+
     const resp = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
 
+    if (resp.status === 429) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.error || '请求过于频繁，请稍后再试');
+    }
+    if (resp.status === 503) {
+      const err = await resp.json().catch(() => ({}));
+      throw new Error(err.error || '今日配额已用完，明天再来');
+    }
     if (resp.status === 401) {
       showAuthModal();
       throw new Error('请先登录');
@@ -322,7 +377,7 @@ function showDocResult(fname, url, sizeBytes, elapsedSec) {
 async function loadVersions(sessionId) {
   if (!sessionId || !currentUser) return;
   try {
-    const resp = await fetch(`/api/history/${sessionId}`);
+    const resp = await fetch(`${BASE}/api/history/${sessionId}`);
     if (!resp.ok) return;
     const data = await resp.json();
     const docs = data.documents || [];
@@ -351,7 +406,7 @@ async function loadVersions(sessionId) {
 
 async function downloadVersion(docId, filename) {
   const a = document.createElement('a');
-  a.href = `/api/docs/${docId}/download`;
+  a.href = `${BASE}/api/docs/${docId}/download`;
   a.download = filename;
   a.click();
 }
@@ -443,7 +498,7 @@ async function loadHistory() {
     return;
   }
   try {
-    const resp = await fetch('/api/history');
+    const resp = await fetch(`${BASE}/api/history`);
     const data = await resp.json();
     renderHistory(data.sessions || []);
   } catch (e) {
@@ -483,7 +538,7 @@ async function loadSessionToPanel(sessionId) {
   if (el) el.classList.add('active');
 
   try {
-    const resp = await fetch(`/api/history/${sessionId}`);
+    const resp = await fetch(`${BASE}/api/history/${sessionId}`);
     const data = await resp.json();
     const docs  = data.documents || [];
     if (!docs.length) return;
@@ -498,7 +553,7 @@ async function loadSessionToPanel(sessionId) {
     document.getElementById('docResultMeta').textContent = fmtSize(latest.file_size || 0);
 
     const dlBtn = document.getElementById('docDownloadBtn');
-    dlBtn.href     = `/api/docs/${latest.id}/download`;
+    dlBtn.href     = `${BASE}/api/docs/${latest.id}/download`;
     dlBtn.download = latest.filename;
     dlBtn.onclick  = null;
 
@@ -517,7 +572,7 @@ async function deleteSession(e, sessionId) {
   e.stopPropagation();
   if (!confirm('确认删除这条记录及其所有文件？')) return;
   try {
-    await fetch(`/api/history/${sessionId}`, { method: 'DELETE' });
+    await fetch(`${BASE}/api/history/${sessionId}`, { method: 'DELETE' });
     if (currentSession?.id == sessionId) {
       currentSession = null;
       clearPanel();
@@ -529,140 +584,72 @@ async function deleteSession(e, sessionId) {
 }
 
 // ══════════════════════════════════════════════════════════════════════
-// 认证（手机验证码）
+// 认证（用户名 + 密码）
 // ══════════════════════════════════════════════════════════════════════
 
 function showAuthModal() {
-  otpSent = false;
-  otpPhone = '';
-  document.getElementById('authPhone').value = '';
-  document.getElementById('authOtp').value   = '';
-  document.getElementById('otpGroup').style.display   = 'none';
-  document.getElementById('mockHint').style.display   = 'none';
-  document.getElementById('resendBtn').disabled = true;
-  document.getElementById('authSubmitBtn').textContent = '获取验证码';
+  document.getElementById('authUsername').value = '';
+  document.getElementById('authPassword').value = '';
+  const err = document.getElementById('authErr');
+  err.style.display = 'none';
+  err.textContent = '';
+  document.getElementById('authSubmitBtn').disabled = false;
+  document.getElementById('authSubmitBtn').textContent = '登录';
   document.getElementById('authModal').classList.add('visible');
-  setTimeout(() => document.getElementById('authPhone').focus(), 200);
+  setTimeout(() => document.getElementById('authUsername').focus(), 200);
 }
 
 function closeAuthModal() {
   document.getElementById('authModal').classList.remove('visible');
-  clearOtpCountdown();
 }
 
-async function sendOtp(isResend = false) {
-  const phone = document.getElementById('authPhone').value.trim();
-  if (!/^1[3-9]\d{9}$/.test(phone)) {
-    alert('请输入有效的手机号');
+async function handleLogin() {
+  const username = document.getElementById('authUsername').value.trim();
+  const password = document.getElementById('authPassword').value;
+  const errEl = document.getElementById('authErr');
+  errEl.style.display = 'none';
+
+  if (!username || !password) {
+    errEl.textContent = '请输入用户名和密码';
+    errEl.style.display = '';
     return;
   }
-  otpPhone = phone;
-
-  const btn = isResend
-    ? document.getElementById('resendBtn')
-    : document.getElementById('authSubmitBtn');
-  btn.disabled = true;
-  btn.textContent = '发送中…';
-
-  try {
-    const resp = await fetch('/api/auth/send-otp', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phone }),
-    });
-    const data = await resp.json();
-    if (!resp.ok) throw new Error(data.error);
-
-    otpSent = true;
-    document.getElementById('otpGroup').style.display = '';
-    const submitBtn = document.getElementById('authSubmitBtn');
-    submitBtn.disabled = false;
-    submitBtn.textContent = '登录 / 注册';
-
-    // mock 模式自动填入验证码
-    if (data.mock && data.code) {
-      const hint = document.getElementById('mockHint');
-      hint.textContent = `开发模式：验证码为 ${data.code}`;
-      hint.style.display = '';
-      document.getElementById('authOtp').value = data.code;
-    }
-
-    // 60s 倒计时
-    startOtpCountdown();
-
-  } catch (e) {
-    alert(e.message || '发送失败，请稍后重试');
-    btn.disabled = false;
-    btn.textContent = isResend ? '重新发送' : '获取验证码';
-  }
-}
-
-function startOtpCountdown() {
-  clearOtpCountdown();
-  let remain = 60;
-  const resend = document.getElementById('resendBtn');
-  resend.disabled = true;
-  resend.textContent = `${remain}s 后重发`;
-  otpCountdown = setInterval(() => {
-    remain--;
-    if (remain <= 0) {
-      clearOtpCountdown();
-      resend.disabled = false;
-      resend.textContent = '重新发送';
-    } else {
-      resend.textContent = `${remain}s 后重发`;
-    }
-  }, 1000);
-}
-
-function clearOtpCountdown() {
-  if (otpCountdown) { clearInterval(otpCountdown); otpCountdown = null; }
-}
-
-async function handleAuth() {
-  if (!otpSent) {
-    await sendOtp(false);
-    return;
-  }
-  // 验证 OTP
-  const otp = document.getElementById('authOtp').value.trim();
-  if (!otp || otp.length !== 6) { alert('请输入6位验证码'); return; }
 
   const btn = document.getElementById('authSubmitBtn');
   btn.disabled = true;
-  btn.textContent = '验证中…';
+  btn.textContent = '登录中…';
 
   try {
-    const resp = await fetch('/api/auth/verify-otp', {
+    const resp = await fetch(`${BASE}/api/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phone: otpPhone, code: otp }),
+      body: JSON.stringify({ username, password }),
     });
     const data = await resp.json();
     if (!resp.ok) throw new Error(data.error);
 
     currentUser = data.user;
-    clearOtpCountdown();
     closeAuthModal();
     updateSidebarUser();
     await loadHistory();
   } catch (e) {
-    alert(e.message || '验证失败');
+    errEl.textContent = e.message || '登录失败';
+    errEl.style.display = '';
     btn.disabled = false;
-    btn.textContent = '登录 / 注册';
+    btn.textContent = '登录';
   }
 }
 
 // 回车快捷键
-document.getElementById('authPhone').addEventListener('keydown', e => {
-  if (e.key === 'Enter') handleAuth();
+document.getElementById('authUsername').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('authPassword').focus();
 });
-document.getElementById('authOtp').addEventListener('keydown', e => {
-  if (e.key === 'Enter') handleAuth();
+document.getElementById('authPassword').addEventListener('keydown', e => {
+  if (e.key === 'Enter') handleLogin();
 });
 
 async function handleLogout() {
-  await fetch('/api/auth/logout', { method: 'POST' });
+  await fetch(`${BASE}/api/auth/logout`, { method: 'POST' });
   currentUser = null;
   currentSession = null;
   updateSidebarUser();
@@ -680,7 +667,7 @@ async function togglePrivacy() {
   }
   const newMode = currentUser.privacy_mode ? 0 : 1;
   try {
-    const resp = await fetch('/api/auth/privacy', {
+    const resp = await fetch(`${BASE}/api/auth/privacy`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ privacy_mode: newMode }),
@@ -709,15 +696,14 @@ function applyPrivacyUI() {
 function updateSidebarUser() {
   const el = document.getElementById('sidebarUser');
   if (!currentUser) {
-    el.innerHTML = `<button class="btn-sidebar-login" onclick="showAuthModal()">登录 / 注册</button>`;
+    el.innerHTML = `<button class="btn-sidebar-login" onclick="showAuthModal()">登录</button>`;
     return;
   }
-  const name = currentUser.nickname || currentUser.phone.replace(/(\d{3})\d{4}(\d{4})/, '$1****$2');
+  const name = currentUser.nickname || currentUser.username || '';
   el.innerHTML = `
     <div class="user-row">
       <span class="points-chip">⭐ ${currentUser.points}</span>
       <span class="sidebar-user-name">${esc(name)}</span>
-      <button class="btn-sidebar-sm" onclick="showRechargeModal()">充值</button>
     </div>
     <div class="user-row" style="gap:6px;padding-top:0">
       <button class="btn-sidebar-sm" onclick="showPointsLog()" style="flex:1">积分记录</button>
@@ -729,7 +715,7 @@ function updateSidebarUser() {
 async function refreshUserPoints() {
   if (!currentUser) return;
   try {
-    const resp = await fetch('/api/auth/me');
+    const resp = await fetch(`${BASE}/api/auth/me`);
     const data = await resp.json();
     if (data.user) {
       currentUser = data.user;
@@ -738,55 +724,6 @@ async function refreshUserPoints() {
   } catch (e) {}
 }
 
-// ══════════════════════════════════════════════════════════════════════
-// 充值
-// ══════════════════════════════════════════════════════════════════════
-
-function showRechargeModal() {
-  selectedRechargeAmount = 0;
-  document.querySelectorAll('.recharge-item').forEach(i => i.classList.remove('selected'));
-  const btn = document.getElementById('rechargeBtn');
-  btn.disabled = true;
-  btn.textContent = '请选择充值金额';
-  document.getElementById('rechargeModal').classList.add('visible');
-}
-
-function closeRechargeModal() {
-  document.getElementById('rechargeModal').classList.remove('visible');
-}
-
-function selectRecharge(amount) {
-  selectedRechargeAmount = amount;
-  document.querySelectorAll('.recharge-item').forEach(i => {
-    i.classList.toggle('selected', parseInt(i.dataset.amount) === amount);
-  });
-  const btn = document.getElementById('rechargeBtn');
-  btn.disabled = false;
-  btn.textContent = `充值 ${amount} 元 = ${amount * 10} 积分`;
-}
-
-async function handleRecharge() {
-  if (!selectedRechargeAmount) return;
-  const btn = document.getElementById('rechargeBtn');
-  btn.disabled = true;
-  btn.textContent = '充值中…';
-  try {
-    const resp = await fetch('/api/points/recharge', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ amount: selectedRechargeAmount }),
-    });
-    const data = await resp.json();
-    if (!resp.ok) throw new Error(data.error);
-    currentUser.points = data.points;
-    updateSidebarUser();
-    closeRechargeModal();
-  } catch (e) {
-    alert(e.message || '充值失败');
-    btn.disabled = false;
-    btn.textContent = `充值 ${selectedRechargeAmount} 元`;
-  }
-}
 
 // ══════════════════════════════════════════════════════════════════════
 // 积分记录
@@ -794,7 +731,7 @@ async function handleRecharge() {
 
 async function showPointsLog() {
   try {
-    const resp = await fetch('/api/points/log');
+    const resp = await fetch(`${BASE}/api/points/log`);
     const data = await resp.json();
     const list = document.getElementById('pointsLogList');
     if (!data.logs?.length) {
@@ -862,7 +799,6 @@ function closeModal(id) {
 document.addEventListener('click', e => {
   if (e.target.classList.contains('modal-overlay')) {
     e.target.classList.remove('visible');
-    if (e.target.id === 'authModal') clearOtpCountdown();
   }
 });
 
@@ -873,8 +809,17 @@ document.addEventListener('click', e => {
 async function init() {
   document.getElementById('mainTitle').textContent = SOURCE_LABELS[source] || '';
   updateRecipientVisibility();
+
+  // 初始化 Turnstile（SDK 异步加载，等 DOMContentLoaded 后再试）
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', _initTurnstile);
+  } else {
+    // SDK 可能还没加载完，稍等一帧
+    setTimeout(_initTurnstile, 200);
+  }
+
   try {
-    const resp = await fetch('/api/auth/me');
+    const resp = await fetch(`${BASE}/api/auth/me`);
     const data = await resp.json();
     if (data.user) {
       currentUser = data.user;

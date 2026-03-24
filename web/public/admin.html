@@ -187,15 +187,18 @@
 
     <!-- 用户管理 -->
     <div class="page" id="page-users">
-      <div class="page-title">用户管理</div>
+      <div class="providers-header">
+        <div class="page-title">用户管理</div>
+        <button class="btn-add" onclick="openCreateUserModal()">+ 新建用户</button>
+      </div>
       <div class="table-wrap">
         <div class="table-header">
           <span class="table-title">用户列表</span>
-          <input type="text" class="search-input" id="userSearch" placeholder="搜索手机号 / 昵称" oninput="debounceSearch()">
+          <input type="text" class="search-input" id="userSearch" placeholder="搜索用户名 / 昵称" oninput="debounceSearch()">
         </div>
         <table>
           <thead><tr>
-            <th>手机号</th><th>昵称</th><th>积分</th><th>生成次数</th><th>注册时间</th><th>操作</th>
+            <th>用户名</th><th>昵称</th><th>积分</th><th>生成次数</th><th>注册时间</th><th>操作</th>
           </tr></thead>
           <tbody id="userTable"></tbody>
         </table>
@@ -215,6 +218,52 @@
     </div>
 
   </main>
+</div>
+
+<!-- 新建用户弹窗 -->
+<div class="modal-overlay" id="createUserModal">
+  <div class="modal" style="width:400px">
+    <div class="modal-header">
+      <div class="modal-title">新建用户</div>
+    </div>
+    <div class="modal-body" style="padding:20px 24px 24px">
+      <div class="form-group">
+        <label class="form-label">用户名 *</label>
+        <input type="text" id="cu-username" class="form-input" placeholder="登录用户名">
+      </div>
+      <div class="form-group">
+        <label class="form-label">密码 *（至少6位）</label>
+        <input type="password" id="cu-password" class="form-input" placeholder="初始密码">
+      </div>
+      <div class="form-group">
+        <label class="form-label">昵称（可选）</label>
+        <input type="text" id="cu-nickname" class="form-input" placeholder="显示名称">
+      </div>
+      <div class="form-group">
+        <label class="form-label">初始积分</label>
+        <input type="number" id="cu-points" class="form-input" value="100" min="0">
+      </div>
+      <div class="err-msg" id="cuErr"></div>
+      <button class="btn-confirm" onclick="submitCreateUser()">创建</button>
+    </div>
+  </div>
+</div>
+
+<!-- 重置密码弹窗 -->
+<div class="modal-overlay" id="resetPwdModal">
+  <div class="modal" style="width:360px">
+    <div class="modal-header">
+      <div class="modal-title">重置密码</div>
+    </div>
+    <div class="modal-body" style="padding:20px 24px 24px">
+      <div class="form-group">
+        <label class="form-label">新密码（至少6位）</label>
+        <input type="password" id="rp-password" class="form-input" placeholder="新密码">
+      </div>
+      <div class="err-msg" id="rpErr"></div>
+      <button class="btn-confirm" onclick="submitResetPwd()">确认重置</button>
+    </div>
+  </div>
 </div>
 
 <!-- Provider 编辑弹窗 -->
@@ -359,14 +408,15 @@ async function loadUsers(page = 1) {
 
   document.getElementById('userTable').innerHTML = (d.users || []).map(u => `
     <tr>
-      <td>${esc(u.phone)}</td>
+      <td>${esc(u.username || u.phone || '—')}</td>
       <td>${esc(u.nickname || '—')}</td>
       <td><span class="badge badge-green">${u.points}</span></td>
       <td>${u.session_count}</td>
       <td>${fmtDate(u.created_at)}</td>
       <td>
         <div class="table-actions">
-          <button class="btn-sm" onclick="openPointsModal(${u.id}, '${esc(u.phone)}')">调整积分</button>
+          <button class="btn-sm" onclick="openPointsModal(${u.id}, '${esc(u.username || u.phone)}')">调整积分</button>
+          <button class="btn-sm" onclick="openResetPwdModal(${u.id})">重置密码</button>
         </div>
       </td>
     </tr>
@@ -384,6 +434,54 @@ async function loadUsers(page = 1) {
 function debounceSearch() {
   clearTimeout(searchTimer);
   searchTimer = setTimeout(() => loadUsers(1), 400);
+}
+
+// ── 新建用户 ──
+let _resetPwdUserId = null;
+
+function openCreateUserModal() {
+  ['cu-username','cu-password','cu-nickname'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('cu-points').value = '100';
+  document.getElementById('cuErr').textContent = '';
+  document.getElementById('createUserModal').classList.add('visible');
+  setTimeout(() => document.getElementById('cu-username').focus(), 150);
+}
+
+async function submitCreateUser() {
+  const username = document.getElementById('cu-username').value.trim();
+  const password = document.getElementById('cu-password').value;
+  const nickname = document.getElementById('cu-nickname').value.trim();
+  const points   = parseInt(document.getElementById('cu-points').value) || 0;
+  const errEl    = document.getElementById('cuErr');
+
+  if (!username || !password) { errEl.textContent = '用户名和密码为必填'; return; }
+  if (password.length < 6)    { errEl.textContent = '密码至少6位'; return; }
+
+  const r = await api('/users', 'POST', { username, password, nickname, points });
+  const d = await r.json();
+  if (!r.ok) { errEl.textContent = d.error || '创建失败'; return; }
+  document.getElementById('createUserModal').classList.remove('visible');
+  loadUsers(currentPage);
+}
+
+function openResetPwdModal(userId) {
+  _resetPwdUserId = userId;
+  document.getElementById('rp-password').value = '';
+  document.getElementById('rpErr').textContent = '';
+  document.getElementById('resetPwdModal').classList.add('visible');
+  setTimeout(() => document.getElementById('rp-password').focus(), 150);
+}
+
+async function submitResetPwd() {
+  const password = document.getElementById('rp-password').value;
+  const errEl    = document.getElementById('rpErr');
+  if (!password || password.length < 6) { errEl.textContent = '密码至少6位'; return; }
+
+  const r = await api(`/users/${_resetPwdUserId}/password`, 'POST', { password });
+  const d = await r.json();
+  if (!r.ok) { errEl.textContent = d.error || '重置失败'; return; }
+  document.getElementById('resetPwdModal').classList.remove('visible');
+  alert('密码已重置');
 }
 
 // ── 积分弹窗 ──
