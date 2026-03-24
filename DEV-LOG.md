@@ -93,6 +93,74 @@
 
 ---
 
+## 本期开发总结（2026-03-24）
+
+### 一、"雷锋模式"：公开免登录服务
+
+**背景**：将 cn-docx 作为 UdiskAI 的公开引流工具，部署在 `udiskai.top/gendoc/`，无需注册即可使用。
+
+**完成内容**：
+
+- `web/middleware/rateLimiter.js`：IP 限速（生成 5次/小时、10次/天；转换 20次/小时、40次/天），已登录用户跳过
+- `web/middleware/turnstile.js`：Cloudflare Turnstile 不可见人机验证，已登录用户跳过
+- `web/middleware/budget.js`：全局每日配额（SQLite 持久化，默认 2000 次/天），已登录用户不占配额
+- `web/routes/generate.js` / `convert.js`：移除强制登录，加入上述三层中间件；游客强制隐私模式（不写磁盘）
+- `web/server.js`：`/config.js` 动态端点注入 `BASE_PATH` + `TURNSTILE_SITEKEY`，无需构建步骤
+- `web/public/app.js`：所有 API 路径加 `BASE` 前缀；Turnstile 预取 token，用完即重置；429/503 错误处理
+- `web/package.json`：新增 `express-rate-limit ^7.5.1`
+
+**部署细节**：
+- 路径 `/gendoc/`，端口 3001，nginx `location ^~ /gendoc/` 反代（`^~` 防止 `.js` 正则覆盖）
+- systemd `gendoc.service`，`User=www-data`，配置写入 `/opt/gendoc/web/.env`
+- Turnstile 使用 `render=explicit&onload=_initTurnstile`，解决 `defer` 加载的竞态问题
+
+**踩坑记录**：
+- `db.exec is not a function`：`budget.js` 应解构 `const { db } = require('../database')`，不能直接 require 整个模块
+- nginx `location /gendoc/` 被 `location ~* \.js$` 覆盖 → 改为 `location ^~ /gendoc/`
+- 服务器目录权限：`chown -R www-data:www-data /opt/gendoc`，根目录 `npm install` 单独执行
+
+---
+
+### 二、Markdown 表格支持
+
+**背景**：用户粘贴含 `|` 分隔符表格的 Markdown 内容时，生成的 Word 文档无法正确渲染为表格。
+
+**完成内容**：
+
+- `generate.js`：新增 `renderTable(node, sizePt, cnFont)` 函数，使用 `docx` 的 `Table / TableRow / TableCell`；表头行浅灰底色加粗，单元格灰色细边框，宽度 100%
+- `renderBodyOfficial` / `renderBodyGeneral`：循环体顶部增加 `type === 'table'` 判断，提前 continue
+- `web/services/parser.js`：系统提示词新增表格节点说明，AI 输出 `{ "type": "table", "headers": [...], "rows": [[...]] }`，分隔行不纳入 rows
+
+---
+
+### 三、UI 重设计
+
+**背景**：原配色冷暖矛盾（暖棕侧边栏 + 靛蓝主色），右侧面板空载时浪费空间，AI 生成区表单过重。
+
+**完成内容**：
+
+**配色**：
+- 侧边栏背景改为白色（`#ffffff`），与主区域同色，右侧 1px 边框分隔，无强调色
+- Logo 改为 `primary-soft` 底 + 靛蓝"文"字；active 状态用 `primary-soft`
+- 全局背景改为 `#f1f5f9`（冷调浅灰）
+
+**右侧文档面板（抽屉式）**：
+- 默认 `width: 0`，不占空间
+- 生成完成后自动以 `.32s cubic-bezier` 滑入
+- 面板头部有 × 关闭按钮；关闭后右下角浮现 Lucide file 图标浮球，点击重新打开
+- 移除空状态占位内容
+
+**AI 生成区简化**：
+- 原"文档目标"+"具体要求"双文本框合并为单文本框
+- 标签改为"一句话生成 Word 文档"，框内完整示例提示语
+
+**其他细节**：
+- "本工具免费 · 不保存记录"从侧边栏移至中间内容区底部
+- UdiskAI 引流卡片保留在侧边栏底部
+- 所有 emoji 图标（📄 👁 ⬇）替换为内联 Lucide SVG（file / eye / download）
+
+---
+
 ## 下一步开发计划：AI 表格服务
 
 ### 产品定位
