@@ -1,6 +1,6 @@
 'use strict';
 
-const db = require('../database');
+const { db } = require('../database');
 
 // 游客每日全局请求配额（SQLite 持久化，重启不丢失）
 db.exec(`
