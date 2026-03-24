@@ -10,13 +10,13 @@
     :root {
       --sidebar-w:    240px;
       --panel-w:      320px;
-      --bg:           #f5f5f4;
+      --bg:           #f1f5f9;
       --surface:      #ffffff;
-      --sidebar-bg:   #1c1917;
-      --sidebar-text: #d6d3d1;
-      --sidebar-muted:#78716c;
-      --sidebar-hover:#292524;
-      --sidebar-active:#3d3834;
+      --sidebar-bg:   #ffffff;
+      --sidebar-text: #374151;
+      --sidebar-muted:#9ca3af;
+      --sidebar-hover:#f1f5f9;
+      --sidebar-active:#eef2ff;
       --primary:      #4f46e5;
       --primary-h:    #4338ca;
       --primary-soft: #eef2ff;
@@ -55,6 +55,7 @@
       width: var(--sidebar-w);
       flex-shrink: 0;
       background: var(--sidebar-bg);
+      border-right: 1px solid var(--border);
       display: flex;
       flex-direction: column;
       height: 100vh;
@@ -67,30 +68,30 @@
       display: flex;
       align-items: center;
       gap: 8px;
-      border-bottom: 1px solid #292524;
+      border-bottom: 1px solid var(--border);
     }
     .sidebar-logo {
       width: 30px; height: 30px;
       border-radius: 8px;
-      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      background: var(--primary-soft);
       display: flex; align-items: center; justify-content: center;
-      font-size: 14px; color: white; font-weight: 700; flex-shrink: 0;
+      font-size: 14px; color: var(--primary); font-weight: 700; flex-shrink: 0;
     }
     .sidebar-brand {
       flex: 1;
       font-size: 13.5px; font-weight: 600;
-      color: #e7e5e4;
+      color: var(--text);
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
     .btn-new {
       padding: 4px 10px;
-      background: #3d3834; color: var(--sidebar-text);
-      border: 1px solid #44403c; border-radius: 6px;
+      background: var(--bg); color: var(--text-2);
+      border: 1px solid var(--border); border-radius: 6px;
       font-size: 12px; font-family: inherit;
       cursor: pointer; white-space: nowrap; flex-shrink: 0;
       transition: background .15s;
     }
-    .btn-new:hover { background: #57534e; }
+    .btn-new:hover { background: var(--border); }
 
     /* 功能区 */
     .sidebar-section {
@@ -122,12 +123,12 @@
       font-size: 13px; font-weight: 500;
       display: flex; align-items: center; gap: 7px;
     }
-    .mode-item.active .mode-item-name { color: #fff; }
+    .mode-item.active .mode-item-name { color: var(--primary); }
     .mode-item-dot {
       width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
       background: var(--sidebar-muted); transition: background .12s;
     }
-    .mode-item.active .mode-item-dot { background: #818cf8; }
+    .mode-item.active .mode-item-dot { background: var(--primary); }
     .mode-item-sub { font-size: 11px; color: var(--sidebar-muted); padding-left: 13px; margin-top: 1px; }
 
     /* 文档类型内联选择（中间区域） */
@@ -182,7 +183,7 @@
       padding: 10px 10px 4px;
     }
     .history-section::-webkit-scrollbar { width: 4px; }
-    .history-section::-webkit-scrollbar-thumb { background: #44403c; border-radius: 2px; }
+    .history-section::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 
     .history-group-label {
       font-size: 10.5px; font-weight: 600; letter-spacing: .06em;
@@ -214,7 +215,7 @@
       border-radius: 4px; transition: opacity .12s, background .12s;
     }
     .history-item:hover .history-item-del { opacity: 1; }
-    .history-item-del:hover { background: #44403c; color: #fca5a5; }
+    .history-item-del:hover { background: #fee2e2; color: #ef4444; }
     .history-empty {
       font-size: 12px; color: var(--sidebar-muted);
       padding: 8px 8px 4px; line-height: 1.5;
@@ -227,7 +228,7 @@
     /* 底部：隐私 + 积分 */
     .sidebar-footer {
       padding: 10px 10px 14px;
-      border-top: 1px solid #292524;
+      border-top: 1px solid var(--border);
       display: flex; flex-direction: column; gap: 8px;
     }
     .privacy-row {
@@ -250,10 +251,10 @@
     .toggle input { opacity: 0; width: 0; height: 0; position: absolute; }
     .toggle-track {
       position: absolute; inset: 0;
-      background: #44403c; border-radius: 9px;
+      background: var(--border); border-radius: 9px;
       transition: background .2s; cursor: pointer;
     }
-    .toggle input:checked + .toggle-track { background: #6366f1; }
+    .toggle input:checked + .toggle-track { background: var(--primary); }
     .toggle-thumb {
       position: absolute; top: 2px; left: 2px;
       width: 14px; height: 14px; border-radius: 50%;
@@ -267,7 +268,7 @@
     }
     .points-chip {
       display: inline-flex; align-items: center; gap: 4px;
-      background: #292524; color: #fbbf24;
+      background: var(--primary-soft); color: var(--primary);
       font-size: 12px; font-weight: 600;
       padding: 3px 9px; border-radius: 20px;
     }
@@ -277,21 +278,21 @@
     }
     .btn-sidebar-sm {
       padding: 3px 8px;
-      background: none; border: 1px solid #44403c;
-      border-radius: 5px; color: var(--sidebar-muted);
+      background: none; border: 1px solid var(--border);
+      border-radius: 5px; color: var(--muted);
       font-size: 11px; font-family: inherit; cursor: pointer;
       white-space: nowrap; flex-shrink: 0;
       transition: all .15s;
     }
-    .btn-sidebar-sm:hover { border-color: #6366f1; color: #818cf8; }
+    .btn-sidebar-sm:hover { border-color: var(--primary); color: var(--primary); }
     .btn-sidebar-login {
       width: 100%; padding: 8px;
-      background: #3d3834; color: #e7e5e4;
-      border: 1px solid #57534e; border-radius: 7px;
+      background: var(--primary-soft); color: var(--primary);
+      border: 1px solid var(--border-focus); border-radius: 7px;
       font-size: 13px; font-weight: 500; font-family: inherit;
       cursor: pointer; transition: background .15s;
     }
-    .btn-sidebar-login:hover { background: #57534e; }
+    .btn-sidebar-login:hover { background: #e0e7ff; }
 
     /* ══════════════════════════════════════
        中间主区域
@@ -324,6 +325,10 @@
     .main-title {
       font-size: 16px; font-weight: 600;
       color: var(--text); margin-bottom: 20px;
+    }
+    .main-footer {
+      text-align: center; font-size: 11px; color: var(--muted);
+      padding: 20px 0 4px; opacity: .7;
     }
 
     /* 输入卡片 */
@@ -458,14 +463,20 @@
     .errbox-msg  { font-size: 13.5px; color: var(--error); line-height: 1.5; }
 
     /* ══════════════════════════════════════
-       右侧文档面板
+       右侧文档面板（抽屉式）
     ══════════════════════════════════════ */
     .right-panel {
-      width: var(--panel-w);
+      width: 0;
       flex-shrink: 0;
+      overflow: hidden;
+      transition: width .32s cubic-bezier(.4,0,.2,1);
+    }
+    .right-panel.open { width: var(--panel-w); }
+    .right-panel-inner {
+      width: var(--panel-w);
+      height: 100vh;
       background: var(--surface);
       border-left: 1px solid var(--border);
-      height: 100vh;
       display: flex; flex-direction: column;
       overflow: hidden;
     }
@@ -475,9 +486,31 @@
       display: flex; align-items: center; gap: 8px;
     }
     .panel-title { font-size: 13px; font-weight: 600; color: var(--text); flex: 1; }
+    .panel-close {
+      width: 26px; height: 26px; flex-shrink: 0;
+      background: none; border: none; cursor: pointer;
+      font-size: 18px; color: var(--muted); border-radius: 6px;
+      display: flex; align-items: center; justify-content: center;
+      transition: background .12s, color .12s;
+    }
+    .panel-close:hover { background: var(--bg); color: var(--text); }
     .panel-body { flex: 1; overflow-y: auto; }
     .panel-body::-webkit-scrollbar { width: 4px; }
     .panel-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    /* 浮球：面板关闭后显示 */
+    .panel-float-btn {
+      position: fixed; bottom: 28px; right: 24px; z-index: 100;
+      display: none;
+      width: 48px; height: 48px; border-radius: 50%;
+      background: var(--primary); color: white;
+      border: none; cursor: pointer; font-size: 20px;
+      box-shadow: 0 4px 16px rgba(79,70,229,.4);
+      transition: transform .15s, box-shadow .15s;
+      align-items: center; justify-content: center;
+    }
+    .panel-float-btn:hover { transform: scale(1.1); box-shadow: 0 6px 20px rgba(79,70,229,.5); }
+    .panel-float-btn.show { display: flex; }
 
     /* 空状态 */
     .panel-empty {
@@ -705,12 +738,9 @@
       border: none; border-radius: 8px; cursor: pointer;
       align-items: center; justify-content: center; flex-direction: column; gap: 4px;
     }
-    .hamburger span { width: 16px; height: 2px; background: #d6d3d1; border-radius: 1px; display: block; }
+    .hamburger span { width: 16px; height: 2px; background: var(--sidebar-text); border-radius: 1px; display: block; }
     .sidebar-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 150; }
 
-    @media (max-width: 900px) {
-      .right-panel { display: none; }
-    }
     @media (max-width: 640px) {
       .sidebar {
         position: fixed; left: -100%; top: 0; z-index: 160;
@@ -762,14 +792,11 @@
 
   <!-- 底部：UdiskAI 品牌引流 -->
   <div class="sidebar-footer">
-    <a href="https://udiskai.top" target="_blank" style="display:block;margin:10px 10px 0;padding:10px 12px;background:#292524;border-radius:8px;text-decoration:none;border:1px solid #3d3834;transition:border-color .15s" onmouseover="this.style.borderColor='#818cf8'" onmouseout="this.style.borderColor='#3d3834'">
-      <div style="font-size:12px;font-weight:600;color:#e7e5e4;margin-bottom:4px">✦ UdiskAI 随身 AI 助手</div>
-      <div style="font-size:11px;color:var(--sidebar-muted);line-height:1.5">Word · Excel · PPT 智能处理<br>带走即用，无需联网</div>
-      <div style="margin-top:6px;font-size:11px;color:#818cf8">了解产品 →</div>
+    <a href="https://udiskai.top" target="_blank" style="display:block;margin:10px 10px 10px;padding:10px 12px;background:var(--primary-soft);border-radius:8px;text-decoration:none;border:1px solid var(--border-focus);transition:border-color .15s" onmouseover="this.style.borderColor='var(--primary)'" onmouseout="this.style.borderColor='var(--border-focus)'">
+      <div style="font-size:12px;font-weight:600;color:var(--text);margin-bottom:4px">✦ UdiskAI 随身 AI 助手</div>
+      <div style="font-size:11px;color:var(--muted);line-height:1.5">Word · Excel · PPT 智能处理<br>带走即用，无需联网</div>
+      <div style="margin-top:6px;font-size:11px;color:var(--primary)">了解产品 →</div>
     </a>
-    <div style="padding:8px 12px 10px;font-size:10.5px;color:#57534e;text-align:center">
-      本工具免费 · 不保存记录
-    </div>
   </div>
 
 </aside>
@@ -805,14 +832,9 @@ AI 会自动识别标题、段落层级、落款单位、日期等信息，无�
       <!-- AI 起草区 -->
       <div class="ai-area" id="aiArea">
         <div class="field">
-          <div class="label">文档目标 <span style="color:var(--error)">*</span></div>
-          <textarea id="goalI" rows="3" style="min-height:72px"
-            placeholder="例：写一份2026年第一季度工作总结，重点突出销售增长"></textarea>
-        </div>
-        <div class="field">
-          <div class="label">具体要求 <span style="font-size:11px;color:var(--muted)">可选</span></div>
-          <textarea id="reqI" rows="3" style="min-height:72px"
-            placeholder="例：约1500字，包含存在问题和下季度计划，语气正式"></textarea>
+          <div class="label">一句话生成 Word 文档</div>
+          <textarea id="aiPromptI" rows="4" style="min-height:96px"
+            placeholder="例：写一份2026年第一季度工作总结，重点突出销售增长，约1500字，语气正式"></textarea>
         </div>
       </div>
 
@@ -903,45 +925,46 @@ AI 会自动识别标题、段落层级、落款单位、日期等信息，无�
     <!-- 错误提示（中间区域） -->
     <div id="feedback"></div>
 
+    <div class="main-footer">本工具免费 · 不保存记录</div>
+
   </div>
 </main>
 
-<!-- ══ 右侧文档面板 ══ -->
-<aside class="right-panel">
+<!-- ══ 右侧文档面板（抽屉） ══ -->
+<aside class="right-panel" id="rightPanel">
+  <div class="right-panel-inner">
 
-  <div class="panel-header">
-    <span class="panel-title">📄 文档</span>
-  </div>
-
-  <div class="panel-body" id="panelBody">
-    <!-- 空状态 -->
-    <div class="panel-empty" id="panelEmpty">
-      <div class="panel-empty-icon">📝</div>
-      <div class="panel-empty-title">文档将显示在这里</div>
-      <div class="panel-empty-sub">生成后可在此预览、下载<br>并查看历史版本</div>
+    <div class="panel-header">
+      <span class="panel-title">📄 文档</span>
+      <button class="panel-close" onclick="closePanel()" title="关闭">×</button>
     </div>
 
-    <!-- 文档结果（生成后显示） -->
-    <div id="docResult" style="display:none">
-      <div class="doc-result">
-        <div class="doc-result-name" id="docResultName">—</div>
-        <div class="doc-result-meta" id="docResultMeta"></div>
-        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-          <a class="btn-dl" id="docDownloadBtn" href="#" download>⬇ 下载文件</a>
-          <button class="btn-preview" id="docPreviewBtn" onclick="openDocxPreview()">👁 预览</button>
+    <div class="panel-body" id="panelBody">
+      <!-- 文档结果（生成后显示） -->
+      <div id="docResult" style="display:none">
+        <div class="doc-result">
+          <div class="doc-result-name" id="docResultName">—</div>
+          <div class="doc-result-meta" id="docResultMeta"></div>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+            <a class="btn-dl" id="docDownloadBtn" href="#" download>⬇ 下载文件</a>
+            <button class="btn-preview" id="docPreviewBtn" onclick="openDocxPreview()">👁 预览</button>
+          </div>
         </div>
-      </div>
 
-      <!-- 版本列表 -->
-      <div class="version-section" id="versionSection" style="display:none">
-        <div class="version-section-title">本次会话版本</div>
-        <div id="versionList"></div>
+        <!-- 版本列表 -->
+        <div class="version-section" id="versionSection" style="display:none">
+          <div class="version-section-title">本次会话版本</div>
+          <div id="versionList"></div>
+        </div>
+
       </div>
 
     </div>
-
   </div>
 </aside>
+
+<!-- 面板关闭后的浮球重开按钮 -->
+<button class="panel-float-btn" id="panelFloatBtn" onclick="openPanel()" title="查看文档">📄</button>
 
 <!-- ══ 登录弹窗 ══ -->
 <div class="modal-overlay" id="authModal">

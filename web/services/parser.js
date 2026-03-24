@@ -27,8 +27,8 @@ const SYSTEM_PROMPT = `你是专业的中文文档结构解析器。将用户输
   - number: 填"1."
   - heading: 去掉序号后的标题部分；若后有正文则拆为 heading+text 两字段
 - level:4 — 四级标题，以"（1）（2）"开头，number 填"（1）"
-- Markdown 表格 — 以 `|` 分隔符构成的表格，输出为 `{ "type": "table", "headers": ["列1","列2",...], "rows": [["值","值",...], ...] }`，不需要 level 字段
-  - 分隔行（`|---|---|`）不纳入 rows，只用于识别表格结构
+- Markdown 表格 — 以 | 分隔符构成的表格，输出为 { "type": "table", "headers": ["列1","列2",...], "rows": [["值","值",...], ...] }，不需要 level 字段
+  - 分隔行（|---|---|）不纳入 rows，只用于识别表格结构
 - 附件说明（"附件：xxx"）放入 attachments 数组，不放 body
 
 ### 元信息提取

@@ -135,8 +135,7 @@ function newSession() {
   currentSession = null;
   // 清空输入
   document.getElementById('content').value = '';
-  document.getElementById('goalI').value   = '';
-  document.getElementById('reqI').value    = '';
+  document.getElementById('aiPromptI').value = '';
   document.getElementById('orgI').value    = '';
   document.getElementById('dateI').value   = '';
   document.getElementById('authorI').value = '';
@@ -247,11 +246,10 @@ async function handlePasteGen() {
 }
 
 async function handleAiGen() {
-  const goal = document.getElementById('goalI').value.trim();
-  if (!goal) return showErr('请填写文档目标');
+  const prompt = document.getElementById('aiPromptI').value.trim();
+  if (!prompt) return showErr('请描述你想生成的文档');
   await callApi(BASE + '/api/generate', {
-    goal,
-    requirements: document.getElementById('reqI').value.trim() || undefined,
+    goal: prompt,
     mode,
     style:   mode === 'official' ? document.getElementById('styleS').value   : undefined,
     docType: mode === 'official' ? document.getElementById('docTypeS').value : undefined,
@@ -350,20 +348,31 @@ async function callApi(url, payload) {
 // 右侧面板
 // ══════════════════════════════════════════════════════════════════════
 
+function openPanel() {
+  document.getElementById('rightPanel').classList.add('open');
+  document.getElementById('panelFloatBtn').classList.remove('show');
+}
+
+function closePanel() {
+  document.getElementById('rightPanel').classList.remove('open');
+  if (lastBlob) document.getElementById('panelFloatBtn').classList.add('show');
+}
+
 function clearPanel() {
-  document.getElementById('panelEmpty').style.display = '';
   document.getElementById('docResult').style.display  = 'none';
   document.getElementById('versionSection').style.display = 'none';
   document.getElementById('docxPreviewBody').innerHTML = '';
   previewRendered = false;
   if (blobUrl) { URL.revokeObjectURL(blobUrl); blobUrl = null; }
   lastBlob = null;
+  document.getElementById('rightPanel').classList.remove('open');
+  document.getElementById('panelFloatBtn').classList.remove('show');
 }
 
 function showDocResult(fname, url, sizeBytes, elapsedSec) {
   previewRendered = false;
-  document.getElementById('panelEmpty').style.display = 'none';
   document.getElementById('docResult').style.display  = '';
+  openPanel();
 
   document.getElementById('docResultName').textContent = fname;
   const meta = [
@@ -550,8 +559,8 @@ async function loadSessionToPanel(sessionId) {
     currentSession = { id: sessionId };
 
     // 展示最新文件
-    document.getElementById('panelEmpty').style.display = 'none';
     document.getElementById('docResult').style.display  = '';
+    openPanel();
     document.getElementById('docResultName').textContent = latest.filename;
     document.getElementById('docResultMeta').textContent = fmtSize(latest.file_size || 0);
 
