@@ -726,7 +726,7 @@
   <!-- 运行时配置：BASE_PATH + Turnstile sitekey（由 Express 动态生成） -->
   <script src="config.js"></script>
   <!-- Cloudflare Turnstile 人机验证 SDK -->
-  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" defer></script>
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit&onload=_initTurnstile" defer></script>
 </head>
 <body>
 

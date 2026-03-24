@@ -30,7 +30,10 @@ function _initTurnstile() {
 
 // 获取一次性 token；若尚未就绪则等待（最多 10s）
 function _getCfToken() {
-  if (!window.TURNSTILE_SITEKEY || !_tsWidgetId) return Promise.resolve(null);
+  if (!window.TURNSTILE_SITEKEY) return Promise.resolve(null);
+  // SDK 已加载但 widget 尚未初始化（用户比 onload 回调更早点击）→ 补初始化
+  if (!_tsWidgetId && window.turnstile) _initTurnstile();
+  if (!_tsWidgetId) return Promise.resolve(null);
   if (_tsToken) {
     const t = _tsToken;
     _tsToken = null;
@@ -809,14 +812,6 @@ document.addEventListener('click', e => {
 async function init() {
   document.getElementById('mainTitle').textContent = SOURCE_LABELS[source] || '';
   updateRecipientVisibility();
-
-  // 初始化 Turnstile（SDK 异步加载，等 DOMContentLoaded 后再试）
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', _initTurnstile);
-  } else {
-    // SDK 可能还没加载完，稍等一帧
-    setTimeout(_initTurnstile, 200);
-  }
 
   try {
     const resp = await fetch(`${BASE}/api/auth/me`);
